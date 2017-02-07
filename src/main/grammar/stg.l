@@ -1,20 +1,20 @@
 %option noyywrap
 %{
 #include <cstdlib>
-#include <stg.tab.hh>
-#define YY_DECL int yylex(yy::stg_parser::semantic_type *yylval, \
-        yy::stg_parser::location_type **yylloc)
+#include "ast.hh"
+#include "parser.hh"
+#define YY_DECL int yylex(yy::stg_parser::semantic_type *yylval, yy::stg_parser::location_type *yylloc)
 // location includes current token
 #define YY_USER_ACTION yylloc->columns (yyleng);
 
-typedef yy::stg_parser::token token;
-%}
-
-%{
-    yylloc->step();
+    typedef yy::stg_parser::token token;
 %}
 
 %%
+%{
+                         yylloc->step();
+%}
+
 [ \t]              ;
 [\n]               { yylloc->lines(1); }
 "default"          { return token::DEFAULT; }

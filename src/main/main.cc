@@ -1,10 +1,10 @@
 #include <iostream>
-#include "src/main/grammar/stg.tab.hh"
-#include "lib/ast.hh"
+#include "ast.hh"
+#include "parser.hh"
 
 int main() {
-  Prog* p;
-  yy::stg_parser parser(*p);
+  Prog p = Prog(new std::vector<Bind*>());
+  yy::stg_parser parser(p);
   int v = parser.parse();
   return v;
 }

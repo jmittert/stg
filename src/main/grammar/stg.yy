@@ -7,27 +7,27 @@
 %{
 #include <iostream>
 using namespace std;
-#include "include/ast.hh"
+#include "ast.hh"
 %}
 
-%parse-param {Prog** p_ret}
+%parse-param {Prog &p_ret}
 %union {
     int ival;
     const char* sval;
     Prog* p;
     Bind* b;
-    LambdaFrom* lf;
+    LambdaForm* lf;
     std::vector<Bind*>* bs;
     Expr* e;
     Alt* a;
-    std::vector<Alts*>* as;
+    Alt* as;
     AAlt* aa;
     PAlt* pa;
     std::vector<AAlt*>* aas;
     std::vector<PAlt*>* pas;
     Dflt* d;
     Literal* l;
-    Prim p;
+    Prim pr;
     Atom* at;
     std::vector<Atom*>* ats;
     Var* v;
@@ -56,7 +56,7 @@ using namespace std;
 %type   <d>             dflt
 %type   <l>             lit
 %type   <u>             update_flag
-%type   <p>             prim
+%type   <pr>             prim
 %type   <at>            atom
 %type   <ats>           atoms
 %type   <v>             var
@@ -65,9 +65,8 @@ using namespace std;
 %type   <pas>           palts
 %type   <aas>           aalts
 %{
-extern int yylex(yy::stg_parser::semantic_type **yylval,
+extern int yylex(yy::stg_parser::semantic_type *yylval,
                      yy::stg_parser::location_type* yylloc);
-void myout(int val);
 %}
 
 %initial-action {
@@ -76,7 +75,7 @@ void myout(int val);
 %%
 
 program
-: binds bind {{$1.push_back($2); $$ = new Program($1); *p_ret = $$}}
+: binds bind {{$1->push_back($2); $$ = new Prog($1); p_ret = *$$;}}
 ;
 
 bind
@@ -85,21 +84,21 @@ bind
 
 binds
 :          {{$$ = new std::vector<Bind*>();}}
-| binds bind{{$1.push_back($2); $$ = $1;}}
+| binds bind{{$1->push_back($2); $$ = $1;}}
 ;
 
 lambdaform
-: LBRACE vars RBRACE update_flag LBRACE vars RBRACE ARROW expr {{$$ = new LambdaFrom($2, $4, $6,$9);}}
+: LBRACE vars RBRACE update_flag LBRACE vars RBRACE ARROW expr {{$$ = new LambdaForm($2, $4, $6,$9);}}
 ;
 
 expr
-: LET binds bind IN expr     {{$3.push_back($2); $$ = new Letrec($2, $5);}}
-| LETREC binds bind IN expr  {{$3.push_back($2); $$ = new Letrec($2, $5);}}
+: LET binds bind IN expr     {{$2->push_back($3); $$ = new LocalDef($2, $5);}}
+| LETREC binds bind IN expr  {{$2->push_back($3); $$ = new LocalRec($2, $5);}}
 | CASE expr OF alts          {{$$ = new Case($2, $4);}}
 | var LBRACE atoms RBRACE    {{$$ = new App($1, $3);}}
 | constr LBRACE atoms RBRACE {{$$ = new SatConstr($1, $3);}}
 | prim LBRACE atoms RBRACE   {{$$ = new SatOp($1, $3);}}
-| lit                        {{$$ = new Lit($1); }}
+| lit                        {{$$ = new Lit($1);}}
 ;
 
 alts
@@ -110,18 +109,18 @@ alts
 
 aalts
 :            {{$$ = new std::vector<AAlt*>();}}
-| aalt aalts {{$1.push_back($2); $$ = $1;}}
+| aalts aalt {{$1->push_back($2); $$ = $1;}}
 
 aalt
-: constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, $3, $6) }}
+: constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, $3, $6);}}
 ;
 palt
-: lit ARROW expr {{ $$ = new PAlt($1, $3); }}
+: lit ARROW expr {{ $$ = new PAlt($1, $3);}}
 ;
 
 palts
 :            {{$$ = new std::vector<PAlt*>();}}
-| palt palts {{$1.push_back($2); $$ = $1;}}
+| palts palt {{$1->push_back($2); $$ = $1;}}
 ;
 
 dflt
@@ -130,7 +129,7 @@ dflt
 ;
 
 lit
-: NUM      {{$$=new Literal($1)}}
+: NUM      {{$$=new Literal($1);}}
 ;
 
 update_flag
@@ -147,13 +146,13 @@ prim
 ;
 
 atom
-: var {{$$ = $1}}
-| lit {{$$ = $1}}
+: var {{$$ = $1;}}
+| lit {{$$ = $1;}}
 ;
 
 atoms
 :            {{$$ = new std::vector<Atom*>();}}
-| atoms atom {{$1.push_back($2); $$ = $1;}}
+| atoms atom {{$1->push_back($2); $$ = $1;}}
 ;
 
 var
@@ -161,10 +160,17 @@ var
 ;
 vars
 :          {{$$ = new std::vector<Var*>();}}
-| vars var {{$1.push_back($2); $$ = $1;}}
+| vars var {{$1->push_back($2); $$ = $1;}}
 ;
 constr
 : CONSTR {{$$ = new Constr($1);}}
 ;
 
 %%
+
+namespace yy {
+    void stg_parser::error(location const &loc, const std::string& s) {
+        std::cerr << "error at " << loc << ": " << s << std::endl;
+    }
+}
+
