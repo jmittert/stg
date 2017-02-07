@@ -10,6 +10,7 @@ using namespace std;
 #include "include/ast.hh"
 %}
 
+%parse-param {Prog** p_ret}
 %union {
     int ival;
     const char* sval;
@@ -75,7 +76,7 @@ void myout(int val);
 %%
 
 program
-: binds bind {{$1.push_back($2); $$ = new Program($1);}}
+: binds bind {{$1.push_back($2); $$ = new Program($1); *p_ret = $$}}
 ;
 
 bind

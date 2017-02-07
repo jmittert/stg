@@ -3,3 +3,6 @@ position.hh
 stack.hh
 stg.tab.cc
 stg.tab.hh
+stg.output
+lex.yy.c
+build

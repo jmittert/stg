@@ -129,7 +129,7 @@ public:
   bool update;
 };
 
-enum Prim {MUL, DIV, ADD, SUB};
+enum Prim {MUL, DIV, ADD, SUB, EQL};
 
 class Atom {};
 
