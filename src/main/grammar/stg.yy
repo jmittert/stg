@@ -79,7 +79,7 @@ program
 ;
 
 bind
-: var EQL lambdaform SEMI {{$$=new Bind($1, $3);}}
+: var ASSIGN lambdaform SEMI {{$$=new Bind($1, $3);}}
 ;
 
 binds
@@ -142,6 +142,7 @@ prim
 | SUB {{$$ = SUB;}}
 | MUL {{$$ = MUL;}}
 | DIV {{$$ = DIV;}}
+| EQL {{$$ = EQL;}}
 ;
 
 atom
