@@ -32,10 +32,10 @@
 "letrec"           { return token::LETREC; }
 "case"             { return token::CASE; }
 "in"               { return token::IN; }
-";"                { return token::SEMI; }
+"of"               { return token::OF; }
 "="                { return token::ASSIGN; }
-[a-z][A-Za-z0-9_]* { return token::VAR; }
-[A-Z][A-Za-z0-9_]* { return token::CONSTR; }
-[0-9]*             { return token::NUM; }
+[a-z][A-Za-z0-9_]* { yylval->sval = yytext; return token::VAR; }
+[A-Z][A-Za-z0-9_]* { yylval->sval = yytext; return token::CONSTR; }
+[0-9]*             { yylval->ival = atoi(yytext); return token::NUM; }
 .                  { printf("Unknown character %c\n", *yytext); }
 %%

@@ -1,14 +1,14 @@
-map = {as} @n {f,sx} ->
+map = {as} @n {f sx} ->
   case xs{} of
-    Nil {} -> Nil {};
-    Cons {y,ys} -> let fy = {f,y} @u {} -> f {y};
-                       mfy = {f,ys} @u {} -> map {f,ys};
-                   in Cons {fy, mfy};
-    default -> Nil {};
+    Nil {} -> Nil {}
+    Cons {y ys} -> let fy = {f y} @u {} -> f {y}
+                       mfy = {f ys} @u {} -> map {f ys}
+                   in Cons {fy mfy}
+    default -> Nil {}
 
-add3 = {} @n {x} -> + {x, 3};
+add3 = {} @n {x} -> + {x 3}
 
 main = {} @n {} ->
-    letrec empty = {} @u {} -> Nil {};
-           lst = {} @u {} -> Cons {3, empty}; in
-    map {addr, lst};
+    letrec empty = {} @u {} -> Nil {}
+           lst = {} @u {} -> Cons {3 empty} in
+    map {addr lst}

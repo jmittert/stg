@@ -13,7 +13,7 @@ using namespace std;
 %parse-param {Prog &p_ret}
 %union {
     int ival;
-    const char* sval;
+    char* sval;
     Prog* p;
     Bind* b;
     LambdaForm* lf;
@@ -41,7 +41,7 @@ using namespace std;
 %token  <ival>          NUM
 %token                  ADD SUB MUL DIV EQL
 %token                  LET LETREC CASE IN ASSIGN DEFAULT OF
-%token                  SEMI LBRACE RBRACE ARROW
+%token                  LBRACE RBRACE ARROW
 %token                  UPDATE NOUPDATE
 %token  <sval>          VAR CONSTR
 
@@ -79,7 +79,7 @@ program
 ;
 
 bind
-: var ASSIGN lambdaform SEMI {{$$=new Bind($1, $3);}}
+: var ASSIGN lambdaform {{$$=new Bind($1, $3);}}
 ;
 
 binds
@@ -107,9 +107,6 @@ alts
 | palts dflt {{$$ = new PAlts($1, $2);}}
 ;
 
-aalts
-:            {{$$ = new std::vector<AAlt*>();}}
-| aalts aalt {{$1->push_back($2); $$ = $1;}}
 
 aalt
 : constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, $3, $6);}}
@@ -117,6 +114,10 @@ aalt
 palt
 : lit ARROW expr {{ $$ = new PAlt($1, $3);}}
 ;
+
+aalts
+:            {{$$ = new std::vector<AAlt*>();}}
+| aalts aalt {{$1->push_back($2); $$ = $1;}}
 
 palts
 :            {{$$ = new std::vector<PAlt*>();}}
@@ -158,10 +159,12 @@ atoms
 var
 : VAR {{$$ = new Var($1);}}
 ;
+
 vars
 :          {{$$ = new std::vector<Var*>();}}
 | vars var {{$1->push_back($2); $$ = $1;}}
 ;
+
 constr
 : CONSTR {{$$ = new Constr($1);}}
 ;
