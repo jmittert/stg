@@ -3,5 +3,5 @@
 
 int eval(Prog& p) {
   State s = State(p);
-  return 0;
+  return s.run_state();
 }

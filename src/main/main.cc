@@ -10,7 +10,8 @@ int main() {
   int v = parser.parse();
   if (v == 0) {
     cout << p << endl;
-    return eval(p);
+    int res = eval(p);
+    cout << "Result: " << res << endl;
   }
   return v;
 }

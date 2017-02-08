@@ -16,9 +16,9 @@ class Closure {
 public:
   // A closure is if of the form (vs @flag xs -> e) ws
   LambdaForm lf;
-  std::map<std::string, int> env;
+  std::map<std::string, Value> env;
 
-  Closure(LambdaForm lf, std::map<std::string, int> env): lf(lf), env(env){}
+  Closure(LambdaForm lf, std::map<std::string, Value> env): lf(lf), env(env){}
 };
 
 class State {
@@ -33,7 +33,7 @@ public:
   // and apply its value to the arguments on the
   // argument stack
   Expr* eval_expr;
-  std::map<std::string, int> eval_env;
+  std::map<std::string, Value> eval_env;
 
   // Enter Arg
   // Apply the closure at address a to the arguments on the
@@ -55,7 +55,7 @@ public:
   std::vector<Value> as;
 
   // The return stack which contains continuations
-  std::vector<std::pair<Alt*, std::map<std::string, int>>> rs;
+  std::vector<std::pair<Alt*, std::map<std::string, Value>>> rs;
 
   // The update stack which contains update frames
   std::vector<int> us;
@@ -65,12 +65,12 @@ public:
 
   // The global environment which gives the addresses of all closures defined
   // At the top level
-  std::map<std::string, int> genv;
+  std::map<std::string, Value> genv;
 
   // Applies function application to the state
   void app();
 
-  // Picks the next_state and transitions to it
-  void next_state();
+  // Runs the state to completion
+  int run_state();
 };
 #endif

@@ -6,9 +6,17 @@ map = {as} @n {f sx} ->
                    in Cons {fy mfy}
     default -> Nil {}
 
+sum = {} @n {f sx} ->
+  case xs{} of
+    Nil {} -> 0
+    Cons {y ys} -> let sys = {ys} @u {} -> sum {ys}
+                   in + {y sys}
+    default -> Nil {}
+
 add3 = {} @n {x} -> + {x 3}
 
 main = {} @n {} ->
     letrec empty = {} @u {} -> Nil {}
-           lst = {} @u {} -> Cons {3 empty} in
-    map {addr lst}
+           lst = {} @u {} -> Cons {3 empty}
+           mapped =  {} @u {} -> map {addr lst}
+           in sum {mapped}
