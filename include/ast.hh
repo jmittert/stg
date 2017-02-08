@@ -181,7 +181,7 @@ public:
 
   std::string toString() const {
     std::stringstream ss;
-    ss << "default -> " << i;
+    ss << i;
     return ss.str();
   }
 

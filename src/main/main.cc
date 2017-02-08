@@ -1,6 +1,7 @@
 #include <iostream>
 #include "ast.hh"
 #include "parser.hh"
+#include "eval.hh"
 
 using namespace std;
 int main() {
@@ -9,6 +10,7 @@ int main() {
   int v = parser.parse();
   if (v == 0) {
     cout << p << endl;
+    return eval(p);
   }
   return v;
 }
