@@ -1,22 +1,32 @@
-%option noyywrap
-%{
+%{ /* -*- C++ -*- */
 #include <cstdlib>
+#include <climits>
+#include <cerrno>
+#include <string>
 #include "ast.hh"
+#include "parser_driver.hh"
 #include "parser.hh"
-#define YY_DECL int yylex(yy::stg_parser::semantic_type *yylval, yy::stg_parser::location_type *yylloc)
-// location includes current token
-#define YY_USER_ACTION yylloc->columns (yyleng);
 
-    typedef yy::stg_parser::token token;
+# undef yywrap
+# define yywrap() 1
+static yy::location loc;
+%}
+
+%option noyywrap nounput batch debug noinput
+
+%{
+#define YY_USER_ACTION loc.columns (yyleng);
+typedef yy::stg_parser::token token;
 %}
 
 %%
 %{
-                         yylloc->step();
+// code run each time yylex is called
+loc.step();
 %}
 
-[ \t]              ;
-[\n]               { yylloc->lines(1); }
+[ \t]+             loc.step() ;
+[\n]+              { loc.lines(yyleng); loc.step(); }
 "default"          { return token::DEFAULT; }
 "+"                { return token::ADD; }
 "-"                { return token::SUB; }
@@ -39,3 +49,22 @@
 [0-9]*             { yylval->ival = atoi(yytext); return token::NUM; }
 .                  { printf("Unknown character %c\n", *yytext); }
 %%
+
+void
+parser_driver::scan_begin ()
+{
+    yy_flex_debug = trace_scanning;
+    if (file.empty () || file == "-")
+        yyin = stdin;
+    else if (!(yyin = fopen (file.c_str (), "r")))
+        {
+            error ("cannot open " + file + ": " + strerror(errno));
+            exit (EXIT_FAILURE);
+        }
+}
+
+void
+parser_driver::scan_end ()
+{
+    fclose (yyin);
+}

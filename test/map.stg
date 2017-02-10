@@ -18,5 +18,5 @@ add3 = {} @n {x} -> + {x 3}
 main = {} @n {} ->
     letrec empty = {} @u {} -> Nil {}
            lst = {} @u {} -> Cons {3 empty}
-           mapped =  {} @u {} -> map {addr lst}
+           mapped =  {} @u {} -> map {add3 lst}
            in sum {mapped}

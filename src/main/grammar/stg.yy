@@ -1,8 +1,28 @@
-%language "C++"
+%skeleton "lalr1.cc" /* -*- C++ -*- */
+%require "3.0.4"
 %defines
-%locations
-
 %define parser_class_name {stg_parser}
+%define parse.assert
+%code requires
+{
+#include <string>
+class parser_driver;
+}
+
+%param { parser_driver& driver }
+%locations
+%initial-action {
+    @$.begin.filename = @$.end.filename = &driver.file;
+ }
+
+/* Enable tracing and verbose errors*/
+%define parse.trace
+%define parse.error verbose
+
+%code
+{
+#include "parser_driver.hh"
+}
 
 %{
 #include <iostream>
@@ -10,7 +30,6 @@ using namespace std;
 #include "ast.hh"
 %}
 
-%parse-param {Prog &p_ret}
 %union {
     int ival;
     char* sval;
@@ -64,18 +83,10 @@ using namespace std;
 %type   <c>             constr
 %type   <pas>           palts
 %type   <aas>           aalts
-%{
-extern int yylex(yy::stg_parser::semantic_type *yylval,
-                     yy::stg_parser::location_type* yylloc);
-%}
-
-%initial-action {
-    @$.begin.filename = @$.end.filename = new std::string("stdin");
- }
 %%
 
 program
-: binds bind {{$1->push_back($2); $$ = new Prog($1); p_ret = *$$;}}
+: binds bind {{$1->push_back($2); $$ = new Prog($1); driver.p = $$;}}
 ;
 
 bind
@@ -170,10 +181,8 @@ constr
 ;
 
 %%
-
-namespace yy {
-    void stg_parser::error(location const &loc, const std::string& s) {
-        std::cerr << "error at " << loc << ": " << s << std::endl;
-    }
+void
+yy::stg_parser::error (const location_type&l, const std::string& m)
+{
+    driver.error(l,m);
 }
-
