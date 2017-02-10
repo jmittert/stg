@@ -272,12 +272,12 @@ public:
 
 class App: public Expr {
 public:
-  App(Var* v, std::vector<Atom*>* a): v(v), a(a){};
-  Var* v;
-  std::vector<Atom*>* a;
+  App(Var* v, std::vector<Atom*>* a): function_name(v), args(a){};
+  Var* function_name;
+  std::vector<Atom*>* args;
 
   std::string toString() const {
-    return "app " + v->toString() + "{" + vecToString(*a) + " }";
+    return "app " + function_name->toString() + "{" + vecToString(*args) + " }";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const App &l){

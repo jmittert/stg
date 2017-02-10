@@ -9,6 +9,8 @@ struct Value
 {
   bool isAddr;
   int i;
+
+  friend std::ostream& operator<<(std::ostream& os, const Value &v);
 };
 
 enum Code {EVAL, ENTER, RETURNCON, RETURNINT};
@@ -66,9 +68,6 @@ public:
   // The global environment which gives the addresses of all closures defined
   // At the top level
   std::map<std::string, Value> genv;
-
-  // Applies function application to the state
-  void app();
 
   // Runs the state to completion
   int run_state();

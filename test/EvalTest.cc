@@ -33,4 +33,11 @@ SUITE(Eval) {
     int res = eval(*p);
     CHECK_EQUAL(6, res);
   }
+
+  TEST(divBy0) {
+    parser_driver driver;
+    driver.parse("../test/divBy0.stg");
+    Prog* p = driver.p;
+    CHECK_THROW(eval(*p), std::runtime_error);
+  }
 }

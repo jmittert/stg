@@ -1,5 +1,6 @@
 #include "state.hh"
 #include <sstream>
+#include <iostream>
 
 using namespace std;
 
@@ -23,7 +24,7 @@ State::State(Prog& p){
 
   // Insert all the addresses into the map
   for (int i = 0; i< binds.size(); i++) {
-    Value v = {false, i};
+    Value v = {true, i};
     genv.insert(pair<string,Value>(binds[i], v));
   }
 
@@ -49,15 +50,12 @@ Value val(map<string, Value> local, map<string, Value> global, Atom* a) {
     if (it2 != global.end()) {
       return it2->second;
     }
-    throw "Could not find variable";
+    throw std::runtime_error("Could not find variable");
   } else if (Literal* t = dynamic_cast<Literal*>(a)) {
     return Value{false, t->i};
   } else {
-    throw "Could not cast atom";
+    throw std::runtime_error("Could not cast atom");
   }
-}
-
-void State::app(){
 }
 
 int State::run_state(){
@@ -66,12 +64,12 @@ int State::run_state(){
     case EVAL:
       // the expr is is a function application
       if (App* a = dynamic_cast<App*>(eval_expr)) {
-        Value v = val(eval_env, genv, a->v);
+        Value v = val(eval_env, genv, a->function_name);
         if (v.isAddr) {
           code = ENTER;
           enter_addr = v.i;
           // Push the arguments onto the arg stack
-          for (auto it = a->a->rbegin(); it!= a->a->rend(); ++it) {
+          for (auto it = a->args->rbegin(); it!= a->args->rend(); ++it) {
             as.push_back(val(eval_env, genv, *it));
           }
         } else {
@@ -136,7 +134,7 @@ int State::run_state(){
         Value v1 = val(eval_env, genv, (*(s->a))[0]);
         Value v2 = val(eval_env, genv, (*(s->a))[1]);
         if (v1.isAddr || v2.isAddr) {
-          throw "Arguments to primitive operator were not ints";
+          throw std::runtime_error("Arguments to primitive operator were not ints");
         }
         int x1 = v1.i;
         int x2 = v2.i;
@@ -153,7 +151,7 @@ int State::run_state(){
           break;
         case DIV:
           if (x2 == 0) {
-            throw "Divide by 0 error";
+            throw std::runtime_error("Divide by 0 error");
           }
           ret_k = x1/x2;
           break;
@@ -280,4 +278,8 @@ int State::run_state(){
       }
     }
   }
+}
+
+std::ostream& operator<<(std::ostream& os, const Value &v){
+  os << (v.isAddr ? "Addr: " : "Prim: ") << v.i;
 }
