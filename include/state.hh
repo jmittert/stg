@@ -72,4 +72,6 @@ public:
   // Runs the state to completion
   int run_state();
 };
+
+std::string printEnv(std::map<std::string, Value>& m);
 #endif

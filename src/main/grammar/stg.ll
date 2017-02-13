@@ -9,24 +9,23 @@
 
 # undef yywrap
 # define yywrap() 1
-static yy::location loc;
 %}
 
 %option noyywrap nounput batch debug noinput
 
 %{
-#define YY_USER_ACTION loc.columns (yyleng);
+#define YY_USER_ACTION yylloc->columns(yyleng);
 typedef yy::stg_parser::token token;
 %}
 
 %%
 %{
 // code run each time yylex is called
-loc.step();
+yylloc->step();
 %}
 
-[ \t]+             loc.step() ;
-[\n]+              { loc.lines(yyleng); loc.step(); }
+[ \t]+             yylloc->step() ;
+[\n]+              { yylloc->lines(yyleng); yylloc->step(); }
 "default"          { return token::DEFAULT; }
 "+"                { return token::ADD; }
 "-"                { return token::SUB; }

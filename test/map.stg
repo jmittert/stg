@@ -1,22 +1,37 @@
-map = {as} @n {f sx} ->
-  case xs{} of
+map = {} @n {f xs} ->
+  case xs{} of {
     Nil {} -> Nil {}
     Cons {y ys} -> let fy = {f y} @u {} -> f {y}
                        mfy = {f ys} @u {} -> map {f ys}
                    in Cons {fy mfy}
     default -> Nil {}
+  }
 
-sum = {} @n {f sx} ->
-  case xs{} of
-    Nil {} -> 0
+sum = {} @n {xs} ->
+  case xs{} of {
+    Nil {} -> Int {0}
     Cons {y ys} -> let sys = {ys} @u {} -> sum {ys}
-                   in + {y sys}
-    default -> Nil {}
+                   in case sys{} of {
+                       Int {x} -> case ys {} of {
+                           Int {y} -> case +{x, y} of {
+                               t -> Int {t}
+                           }
+                           default -> 1
+                       }
+                      default -> 1
+                   }
+    default -> Nil { }
+    }
 
-add3 = {} @n {x} -> + {x 3}
+add3 = {} @n {x} -> case x{} of {
+    Int {x} -> case + {x 3} of {
+        t -> Int {t}
+    }
+    default -> 0
+    }
 
 main = {} @n {} ->
     letrec empty = {} @u {} -> Nil {}
            lst = {} @u {} -> Cons {3 empty}
-           mapped =  {} @u {} -> map {add3 lst}
+           mapped = {lst} @u {} -> map {add3 lst}
            in sum {mapped}

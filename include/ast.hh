@@ -303,12 +303,12 @@ public:
 
 class SatOp: public Expr {
 public:
-  SatOp(Prim p, std::vector<Atom*>* a): p(p), a(a){};
-  Prim p;
+  SatOp(Prim prim, std::vector<Atom*>* a): prim(prim), a(a){};
+  Prim prim;
   std::vector<Atom*>* a;
 
   std::string toString() const {
-    return primToString(p) + " { " + vecToString(*a) + " }";
+    return primToString(prim) + " { " + vecToString(*a) + " }";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const SatOp &l){
@@ -340,7 +340,7 @@ public:
   Dflt* d;
 
   std::string toString() const {
-    return vecToString(*v) + d->toString();
+    return "AAlts: " + vecToString(*v) + d->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const AAlts &l){
@@ -355,7 +355,7 @@ public:
   Dflt* d;
 
   std::string toString() const {
-    return vecToString(*v) + d->toString();
+    return "PAlts: " + vecToString(*v) + d->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const PAlts &l){

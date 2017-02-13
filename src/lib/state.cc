@@ -32,12 +32,24 @@ State::State(Prog& p){
     h.push_back(Closure(lambda, genv));
   }
 
+  // Set up the initial conditions
+  // We want to evaluate main with nothing in the environment
+  // except the globals
   code = EVAL;
   auto main_closure = h[genv.find("main")->second.i];
   eval_expr = main_closure.lf.e;
-  eval_env = genv;
+  eval_env = map<string, Value>();
 }
 
+std::string printEnv(map<string, Value>& m) {
+  stringstream ss;
+  ss << "{\n";
+  for (auto& pair : m) {
+    ss << pair.first << ": " << pair.second << endl;
+  }
+  ss << "}\n";
+  return ss.str();
+}
 
 Value val(map<string, Value> local, map<string, Value> global, Atom* a) {
   if (Var* t = dynamic_cast<Var*>(a)) {
@@ -50,7 +62,9 @@ Value val(map<string, Value> local, map<string, Value> global, Atom* a) {
     if (it2 != global.end()) {
       return it2->second;
     }
-    throw std::runtime_error("Could not find variable");
+    cout << "local: " << printEnv(local) << endl;
+    cout << "global: " << printEnv(global) << endl;
+    throw std::runtime_error("Could not find variable: " + t->s);
   } else if (Literal* t = dynamic_cast<Literal*>(a)) {
     return Value{false, t->i};
   } else {
@@ -62,21 +76,27 @@ int State::run_state(){
   while (1){
     switch (code) {
     case EVAL:
-      // the expr is is a function application
       if (App* a = dynamic_cast<App*>(eval_expr)) {
+        // Function application
         Value v = val(eval_env, genv, a->function_name);
         if (v.isAddr) {
+          // If the name resolves to a pointer, then we have a function
+          // Push the appropriate arguments onto the stack then eval it
           code = ENTER;
           enter_addr = v.i;
-          // Push the arguments onto the arg stack
-          for (auto it = a->args->rbegin(); it!= a->args->rend(); ++it) {
-            as.push_back(val(eval_env, genv, *it));
+          // Push the arguments in backwards order so they then match
+          // the function when we pop them
+          for (auto it = a->args->rbegin(); it != a->args->rend(); ++it) {
+            const Value v = val(eval_env, genv, *it);
+            //cout << "pushing arg: " << v << endl;
+            as.push_back(v);
           }
         } else {
+          // Otherwise, if the name is a primitive, prepare to return it
+          // to the next continuation
           code = RETURNINT;
           ret_k = v.i;
         }
-        // Let definition
       } else if (LocalDef* l = dynamic_cast<LocalDef*>(eval_expr)) {
         code = EVAL;
         eval_expr = l->e;
@@ -110,6 +130,7 @@ int State::run_state(){
           Value v = {true, addr++};
           eval_env.insert(pair<string,Value>(var, v));
         }
+        cout << printEnv(eval_env) << endl;;
 
         // add all the binds to the heap
         for (auto& bind: *(l->binds)) {
@@ -134,12 +155,19 @@ int State::run_state(){
         Value v1 = val(eval_env, genv, (*(s->a))[0]);
         Value v2 = val(eval_env, genv, (*(s->a))[1]);
         if (v1.isAddr || v2.isAddr) {
-          throw std::runtime_error("Arguments to primitive operator were not ints");
+          stringstream ss;
+          ss << "Arguments to primitive operator were not ints" << endl;
+          ss << "Prim: " << primToString(s->prim) << endl;;
+          ss << "Arg1: " << v1 << endl;
+          ss << "Arg2: " << v2 << endl;
+          ss << "Local: " << printEnv(eval_env) << endl;
+          ss << "Global: " << printEnv(genv) << endl;
+          throw std::runtime_error(ss.str());
         }
         int x1 = v1.i;
         int x2 = v2.i;
         code = RETURNINT;
-        switch(s->p) {
+        switch(s->prim) {
         case ADD:
           ret_k = x1+x2;
           break;
@@ -168,15 +196,22 @@ int State::run_state(){
         if (true) {
           code = EVAL;
           eval_expr = lf.e;
-          eval_env = map<string, Value>();
+          eval_env = clos.env;
+          // Insert every free variable into the environment
           for (auto& var : *(lf.v1)) {
-            eval_env.insert(pair<string, Value>(var->s, genv.find(var->s)->second));
+            const Value v = genv.find(var->s)->second;
+            eval_env.insert(pair<string, Value>(var->s, v));
           }
+
+          // Then insert each function argument into the environment
+          // Each variable in the lambda form arguments will match one
+          // to one with one on the argument stack
           for (auto& var : *(lf.v2)) {
             Value v = as.back();
             as.pop_back();
             eval_env.insert(pair<string, Value>(var->s, v));
           }
+          cout << "Entering Closure: " << lf << " with env\n" << printEnv(eval_env) << endl;
         }
       }
       break;
@@ -192,8 +227,10 @@ int State::run_state(){
             break;
           }
         }
+        eval_env = top.second;
         // If match is not NULL take it, else use the default
         if (match) {
+          cout << "Matched "  << *eval_expr << endl;
           code = EVAL;
           eval_expr = match->e;
           // Assign the variables to the values of the actual arguments
@@ -205,10 +242,10 @@ int State::run_state(){
           Dflt* dflt = aalts->d;
           // if there is not variable bound, just set the expression
           // If there is, we need to allocate a constructor closure to bind to it
-          if (Unnamed* u = dynamic_cast<Unnamed*>(u)) {
+          if (Unnamed* u = dynamic_cast<Unnamed*>(dflt)) {
             code = EVAL;
             eval_expr = u->e;
-          } else if (Named* n = dynamic_cast<Named*>(u)) {
+          } else if (Named* n = dynamic_cast<Named*>(dflt)) {
             code = EVAL;
             eval_expr = u->e;
             // Create a list of arbitrary vars to match the addresses we have
@@ -247,6 +284,30 @@ int State::run_state(){
         pair<Alt*, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
         PAlts* palts = dynamic_cast<PAlts*>(top.first);
+        if (palts == NULL){
+          // Try default
+          Default* def = dynamic_cast<Default*>(top.first);
+          if (def != NULL) {
+            Dflt* dflt = def->d;
+            // if there is not variable bound, just set the expression
+            // If there is, we need to allocate a constructor closure to bind to it
+            if (Unnamed* u = dynamic_cast<Unnamed*>(u)) {
+              code = EVAL;
+              eval_expr = u->e;
+            } else if (Named* n = dynamic_cast<Named*>(u)) {
+              cout << "named" << endl;
+              code = EVAL;
+              eval_expr = u->e;
+              Value v = {false, ret_k};
+              eval_env.insert(pair<string, Value>(n->v->s, v));
+            }
+            break;
+          }
+          AAlts* aalts = dynamic_cast<AAlts*>(top.first);
+          stringstream ss;
+          ss << "Tried to match a value " << ret_k << " against a AAlts " << *aalts;
+          throw std::runtime_error(ss.str());
+        }
         PAlt* match = NULL;
         for (auto& palt: *(palts->v)) {
           if (palt->l->i == ret_k) {

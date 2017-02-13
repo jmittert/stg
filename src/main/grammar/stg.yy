@@ -105,7 +105,7 @@ lambdaform
 expr
 : LET binds bind IN expr     {{$2->push_back($3); $$ = new LocalDef($2, $5);}}
 | LETREC binds bind IN expr  {{$2->push_back($3); $$ = new LocalRec($2, $5);}}
-| CASE expr OF alts          {{$$ = new Case($2, $4);}}
+| CASE expr OF LBRACE alts RBRACE    {{$$ = new Case($2, $5);}}
 | var LBRACE atoms RBRACE    {{$$ = new App($1, $3);}}
 | constr LBRACE atoms RBRACE {{$$ = new SatConstr($1, $3);}}
 | prim LBRACE atoms RBRACE   {{$$ = new SatOp($1, $3);}}
