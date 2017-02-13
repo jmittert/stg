@@ -31,35 +31,33 @@ using namespace std;
 %}
 
 %union {
-    int ival;
-    char* sval;
-    Prog* p;
-    Bind* b;
-    LambdaForm* lf;
-    std::vector<Bind*>* bs;
-    Expr* e;
-    Alt* a;
-    Alt* as;
-    AAlt* aa;
-    PAlt* pa;
-    std::vector<AAlt*>* aas;
-    std::vector<PAlt*>* pas;
-    Dflt* d;
-    Literal* l;
-    Prim pr;
-    Atom* at;
-    std::vector<Atom*>* ats;
-    Var* v;
-    std::vector<Var*>* vs;
-    Constr* c;
-    UpdateFlag* u;
+  int ival;
+  char* sval;
+  Prog* p;
+  Bind* b;
+  LambdaForm* lf;
+  std::vector<Bind*>* bs;
+  Expr* e;
+  AAlt* aa;
+  PAlt* pa;
+  std::vector<AAlt*>* aas;
+  std::vector<PAlt*>* pas;
+  Dflt* d;
+  Literal* l;
+  Prim pr;
+  Atom* at;
+  std::vector<Atom*>* ats;
+  Var* v;
+  std::vector<Var*>* vs;
+  Constr* c;
+  UpdateFlag* u;
 }
 
 
 /* Tokens */
 %token  <ival>          NUM
 %token                  ADD SUB MUL DIV EQL
-%token                  LET LETREC CASE IN ASSIGN DEFAULT OF
+%token                  LET LETREC CASE CASEP IN ASSIGN DEFAULT OF
 %token                  LBRACE RBRACE ARROW
 %token                  UPDATE NOUPDATE
 %token  <sval>          VAR CONSTR
@@ -68,7 +66,6 @@ using namespace std;
 %type   <b>             bind
 %type   <bs>            binds
 %type   <e>             expr
-%type   <as>            alts
 %type   <lf>            lambdaform
 %type   <aa>            aalt
 %type   <pa>            palt
@@ -105,19 +102,13 @@ lambdaform
 expr
 : LET binds bind IN expr     {{$2->push_back($3); $$ = new LocalDef($2, $5);}}
 | LETREC binds bind IN expr  {{$2->push_back($3); $$ = new LocalRec($2, $5);}}
-| CASE expr OF LBRACE alts RBRACE    {{$$ = new Case($2, $5);}}
+| CASE expr OF LBRACE aalts dflt RBRACE    {{$$ = new Case($2, new AAlts($5, $6));}}
+| CASEP expr OF LBRACE palts dflt RBRACE    {{$$ = new Case($2, new PAlts($5, $6));}}
 | var LBRACE atoms RBRACE    {{$$ = new App($1, $3);}}
 | constr LBRACE atoms RBRACE {{$$ = new SatConstr($1, $3);}}
 | prim LBRACE atoms RBRACE   {{$$ = new SatOp($1, $3);}}
 | lit                        {{$$ = new Lit($1);}}
 ;
-
-alts
-: dflt       {{$$ = new Default($1);}}
-| aalts dflt {{$$ = new AAlts($1, $2);}}
-| palts dflt {{$$ = new PAlts($1, $2);}}
-;
-
 
 aalt
 : constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, $3, $6);}}
@@ -136,7 +127,8 @@ palts
 ;
 
 dflt
-: var ARROW expr {{$$ = new Named($1, $3);}}
+:                {{$$ = new NoDflt(); }}
+| var ARROW expr {{$$ = new Named($1, $3);}}
 | DEFAULT ARROW expr {{$$ = new Unnamed($3);}}
 ;
 

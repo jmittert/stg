@@ -40,6 +40,7 @@ yylloc->step();
 "let"              { return token::LET; }
 "letrec"           { return token::LETREC; }
 "case"             { return token::CASE; }
+"case'"            { return token::CASEP; }
 "in"               { return token::IN; }
 "of"               { return token::OF; }
 "="                { return token::ASSIGN; }

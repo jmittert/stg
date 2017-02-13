@@ -174,6 +174,20 @@ public:
   }
 };
 
+class NoDflt: public Dflt {
+public:
+  NoDflt(){};
+
+  std::string toString() const {
+    return "";
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const NoDflt &u){
+    os << u.toString();
+    return os;
+  }
+};
+
 class Literal: public Atom {
 public:
   Literal(int i): i(i){};

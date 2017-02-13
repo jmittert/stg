@@ -40,4 +40,12 @@ SUITE(Eval) {
     Prog* p = driver.p;
     CHECK_THROW(eval(*p), std::runtime_error);
   }
+
+  TEST(map) {
+    parser_driver driver;
+    driver.parse("../test/map.stg");
+    Prog* p = driver.p;
+    int res = eval(*p);
+    CHECK_EQUAL(6, res);
+  }
 }

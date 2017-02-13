@@ -88,7 +88,6 @@ int State::run_state(){
           // the function when we pop them
           for (auto it = a->args->rbegin(); it != a->args->rend(); ++it) {
             const Value v = val(eval_env, genv, *it);
-            //cout << "pushing arg: " << v << endl;
             as.push_back(v);
           }
         } else {
@@ -130,7 +129,6 @@ int State::run_state(){
           Value v = {true, addr++};
           eval_env.insert(pair<string,Value>(var, v));
         }
-        cout << printEnv(eval_env) << endl;;
 
         // add all the binds to the heap
         for (auto& bind: *(l->binds)) {
@@ -211,12 +209,16 @@ int State::run_state(){
             as.pop_back();
             eval_env.insert(pair<string, Value>(var->s, v));
           }
-          cout << "Entering Closure: " << lf << " with env\n" << printEnv(eval_env) << endl;
         }
       }
       break;
     case RETURNCON:
       {
+        // If the return stack is empty, we're done. Return the first
+        // arugment of the constructor
+        if (rs.empty()) {
+          return constr_values[0].i;
+        }
         pair<Alt*, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
         AAlts* aalts = dynamic_cast<AAlts*>(top.first);
@@ -230,7 +232,6 @@ int State::run_state(){
         eval_env = top.second;
         // If match is not NULL take it, else use the default
         if (match) {
-          cout << "Matched "  << *eval_expr << endl;
           code = EVAL;
           eval_expr = match->e;
           // Assign the variables to the values of the actual arguments
@@ -270,6 +271,10 @@ int State::run_state(){
             Value v = {true, addr};
             h.push_back(constr);
             eval_env.insert(pair<string, Value>(n->v->s, v));
+          } else if (NoDflt* n = dynamic_cast<NoDflt*>(dflt)) {
+            stringstream ss;
+            ss << "No default matched in " << *aalts << " for " << return_constr->s << endl;
+            throw std::runtime_error(ss.str());
           }
         }
 
@@ -295,7 +300,6 @@ int State::run_state(){
               code = EVAL;
               eval_expr = u->e;
             } else if (Named* n = dynamic_cast<Named*>(u)) {
-              cout << "named" << endl;
               code = EVAL;
               eval_expr = u->e;
               Value v = {false, ret_k};
@@ -324,15 +328,20 @@ int State::run_state(){
           Dflt* dflt = palts->d;
           // if there is not variable bound, just set the expression
           // If there is, we need to allocate a constructor closure to bind to it
-          if (Unnamed* u = dynamic_cast<Unnamed*>(u)) {
+          if (Unnamed* u = dynamic_cast<Unnamed*>(dflt)) {
             code = EVAL;
             eval_expr = u->e;
-          } else if (Named* n = dynamic_cast<Named*>(u)) {
+          } else if (Named* n = dynamic_cast<Named*>(dflt)) {
             code = EVAL;
-            eval_expr = u->e;
+            eval_expr = n->e;
             Value v = {false, ret_k};
             eval_env.insert(pair<string, Value>(n->v->s, v));
+          } else if (NoDflt* n = dynamic_cast<NoDflt*>(dflt)) {
+            stringstream ss;
+            ss << "No default matched in " << *palts << " for " << ret_k << endl;
+            throw std::runtime_error(ss.str());
           }
+
         }
 
         break;

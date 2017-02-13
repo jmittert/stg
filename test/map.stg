@@ -4,7 +4,6 @@ map = {} @n {f xs} ->
     Cons {y ys} -> let fy = {f y} @u {} -> f {y}
                        mfy = {f ys} @u {} -> map {f ys}
                    in Cons {fy mfy}
-    default -> Nil {}
   }
 
 sum = {} @n {xs} ->
@@ -12,26 +11,23 @@ sum = {} @n {xs} ->
     Nil {} -> Int {0}
     Cons {y ys} -> let sys = {ys} @u {} -> sum {ys}
                    in case sys{} of {
-                       Int {x} -> case ys {} of {
-                           Int {y} -> case +{x, y} of {
+                       Int {x1} -> case y {} of {
+                           Int {x2} -> case' +{x1 x2} of {
                                t -> Int {t}
                            }
-                           default -> 1
                        }
-                      default -> 1
                    }
-    default -> Nil { }
     }
 
 add3 = {} @n {x} -> case x{} of {
-    Int {x} -> case + {x 3} of {
+    Int {x1} -> case' + {x1 3} of {
         t -> Int {t}
     }
-    default -> 0
     }
 
 main = {} @n {} ->
     letrec empty = {} @u {} -> Nil {}
-           lst = {} @u {} -> Cons {3 empty}
+           three = {} @u {} -> Int {3}
+           lst = {} @u {} -> Cons {three empty}
            mapped = {lst} @u {} -> map {add3 lst}
            in sum {mapped}
