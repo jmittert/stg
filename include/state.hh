@@ -18,9 +18,9 @@ class Closure {
 public:
   // A closure is if of the form (vs @flag xs -> e) ws
   LambdaForm lf;
-  std::map<std::string, Value> env;
+  std::vector<Value> free_vars;
 
-  Closure(LambdaForm lf, std::map<std::string, Value> env): lf(lf), env(env){}
+  Closure(LambdaForm lf, std::vector<Value> free_vars): lf(lf), free_vars(free_vars){}
 };
 
 class State {
