@@ -60,7 +60,9 @@ public:
   std::vector<std::pair<Alt*, std::map<std::string, Value>>> rs;
 
   // The update stack which contains update frames
-  std::vector<int> us;
+  // A frame is a triple of the arugment stack, the return stack and the
+  // closure being entered
+  std::vector<std::tuple<std::vector<Value>, std::vector<std::pair<Alt*, std::map<std::string, Value>>>, Closure*>> us;
 
   // The heap, h which contains closures
   std::vector<Closure> h;

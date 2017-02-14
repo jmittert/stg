@@ -10,7 +10,7 @@ State::State(Prog& p){
   // closures to the heap
   as = vector<Value>();
   rs = vector<pair<Alt*, map<string, Value>>>();
-  us = vector<int>();
+  us = vector<tuple<vector<Value>, vector<pair<Alt*, map<string, Value>>>, Closure* >>();
   h = vector<Closure>();
   genv  = map<string, Value>();
 
@@ -23,7 +23,7 @@ State::State(Prog& p){
   }
 
   // Insert all the addresses into the map
-  for (int i = 0; i< binds.size(); i++) {
+  for (int i = 0; i < (int)binds.size(); i++) {
     Value v = {true, i};
     genv.insert(pair<string,Value>(binds[i], v));
   }
@@ -133,7 +133,6 @@ int State::run_state(){
         // add all the binds to the heap
         for (auto& bind: *(l->binds)) {
           Closure c = Closure(*(bind->lf), eval_env);
-          int addr = h.size();
           h.push_back(c);
         }
       } else if (Case* c = dynamic_cast<Case*>(eval_expr)) {
@@ -179,7 +178,7 @@ int State::run_state(){
           if (x2 == 0) {
             throw std::runtime_error("Divide by 0 error");
           }
-          ret_k = x1/x2;
+          ret_k = x1 / x2;
           break;
         }
       }
@@ -188,10 +187,40 @@ int State::run_state(){
       {
         Closure clos = h[enter_addr];
         LambdaForm lf = clos.lf;
+        // If there are no enough arguments on the stack for the closure, we
+        // need to pop an update frame to fill in the rest
+        unsigned as_size = as.size();
+        vector<Var*>* xs = lf.v2;
+        if (xs->size() > as_size) {
+          auto tup = us.back();
+          us.pop_back();
+          // Append on the popped argument stack
+          auto as_popped = get<0>(tup);
+          as.insert(as.begin(), as_popped.begin(), as_popped.end());
+
+          // The return stack must be empty, use the popped one
+          rs = get<1>(tup);
+
+          Closure* clos_update = get<2>(tup);
+          // The arguments that were defined
+          vector<Var*> xs1(xs->rend(), xs->rend()+as_size);
+          // The remaining arguments
+          vector<Var*>* xs2 = new vector<Var*>(xs->rend()+as_size, xs->rbegin());
+          vector<Var*>* vs = new vector<Var*>();
+          vs->insert(vs->end(), lf.v1->begin(), lf.v1->end());
+          vs->insert(vs->end(), xs1.begin(), xs1.end());
+          LambdaForm lf_updated = LambdaForm(vs, new UpdateFlag(false), xs2, lf.e);
+          std::map<std::string, Value> new_env = clos.env;
+          // Add each bound argument to the new environment
+          for (unsigned i = 0; i < as_size; i++) {
+            new_env.insert(make_pair((*xs)[i]->s, as[i]));
+          }
+          // Update the closure
+          *clos_update = Closure(lf_updated, new_env);
+        }
         // For non updatable closures
-        //if (!lf.u->update) {
-        // For now, don't update any closures
-        if (true) {
+        if (!lf.u->update) {
+          // For now, don't update any closures
           code = EVAL;
           eval_expr = lf.e;
           eval_env = clos.env;
@@ -209,15 +238,51 @@ int State::run_state(){
             as.pop_back();
             eval_env.insert(pair<string, Value>(var->s, v));
           }
+        } else {
+          // Updatable closures
+          us.push_back(make_tuple(as,rs, &clos));
+          as = vector<Value>();
+          rs = vector<pair<Alt*, map<string, Value>>>();
+          code = EVAL;
+          eval_expr = lf.e;
+          eval_env = clos.env;
         }
       }
       break;
     case RETURNCON:
       {
-        // If the return stack is empty, we're done. Return the first
-        // arugment of the constructor
+        // If the return stack is empty, check for a possible update
         if (rs.empty()) {
-          return constr_values[0].i;
+          // If the update stack is empty, we're done
+          if (us.empty()) {
+            return constr_values[0].i;
+          }
+          auto tup = us.back();
+          us.pop_back();
+          as = get<0>(tup);
+          rs = get<1>(tup);
+
+          Closure *clos = get<2>(tup);
+
+          // Create a list of arbitrary vars to match the addresses we have
+          int num_bars = constr_values.size();
+          vector<Var*>* arb_vars = new vector<Var*>();
+          map<string, Value> arb_env;
+          for (int i = 0; i < num_bars; i++) {
+            stringstream ss;
+            ss << "x" << i;
+            string s = ss.str();
+            arb_vars->push_back(new Var(s));
+            arb_env.insert(pair<string,Value>(s, constr_values[i]));
+          }
+          vector<Atom*>* arb_atoms = new vector<Atom*>();
+          for (auto& var : *arb_vars) {
+            arb_atoms->push_back(var);
+          }
+
+          LambdaForm lf = LambdaForm(arb_vars, new UpdateFlag(false), new vector<Var*>(), new SatConstr(return_constr, arb_atoms));
+          // Update the closure
+          *clos = Closure(lf, arb_env);
         }
         pair<Alt*, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
@@ -235,7 +300,7 @@ int State::run_state(){
           code = EVAL;
           eval_expr = match->e;
           // Assign the variables to the values of the actual arguments
-          for (int i = 0; i< constr_values.size(); ++i) {
+          for (unsigned i = 0; i < constr_values.size(); ++i) {
             eval_env.insert(pair<string, Value>((*(match->v))[i]->s, constr_values[i]));
           }
         } else {
@@ -296,10 +361,10 @@ int State::run_state(){
             Dflt* dflt = def->d;
             // if there is not variable bound, just set the expression
             // If there is, we need to allocate a constructor closure to bind to it
-            if (Unnamed* u = dynamic_cast<Unnamed*>(u)) {
+            if (Unnamed* u = dynamic_cast<Unnamed*>(dflt)) {
               code = EVAL;
               eval_expr = u->e;
-            } else if (Named* n = dynamic_cast<Named*>(u)) {
+            } else if (Named* n = dynamic_cast<Named*>(dflt)) {
               code = EVAL;
               eval_expr = u->e;
               Value v = {false, ret_k};
@@ -351,5 +416,5 @@ int State::run_state(){
 }
 
 std::ostream& operator<<(std::ostream& os, const Value &v){
-  os << (v.isAddr ? "Addr: " : "Prim: ") << v.i;
+  return os << (v.isAddr ? "Addr: " : "Prim: ") << v.i;
 }

@@ -31,7 +31,6 @@ yylloc->step();
 "-"                { return token::SUB; }
 "*"                { return token::MUL; }
 "/"                { return token::DIV; }
-"=="               { return token::EQL; }
 "@u"               { return token::UPDATE; }
 "@n"               { return token::NOUPDATE; }
 "->"               { return token::ARROW; }

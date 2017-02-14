@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project( STG )
 
 set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_COMPILER clang++)
 enable_testing()
 
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR})

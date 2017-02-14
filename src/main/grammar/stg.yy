@@ -56,7 +56,7 @@ using namespace std;
 
 /* Tokens */
 %token  <ival>          NUM
-%token                  ADD SUB MUL DIV EQL
+%token                  ADD SUB MUL DIV
 %token                  LET LETREC CASE CASEP IN ASSIGN DEFAULT OF
 %token                  LBRACE RBRACE ARROW
 %token                  UPDATE NOUPDATE
@@ -146,7 +146,6 @@ prim
 | SUB {{$$ = SUB;}}
 | MUL {{$$ = MUL;}}
 | DIV {{$$ = DIV;}}
-| EQL {{$$ = EQL;}}
 ;
 
 atom

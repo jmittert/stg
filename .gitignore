@@ -6,3 +6,7 @@ stg.tab.hh
 stg.output
 lex.yy.c
 build
+compile_commands.json
+cscope.files
+cscope.out
+.clang_complete
