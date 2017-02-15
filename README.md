@@ -50,7 +50,11 @@ main = {} @n {} ->
            mapped = {lst} @u {} -> map {add3 lst}
            in sum {mapped}
 ```
-In this more complex example, we demonstrate case and patter matching, let bindings, letrec binddings and higher order functions
+In this more complex example, we demonstrate case and patter matching, let
+bindings, letrec bindings and higher order functions
+
+Running adds 3 to each element in [3] and sums the result, giving 6. This is
+appropriately equivalent to the Haskell code `sum $ map (+3) [3]`.
 
 
 ## Build
