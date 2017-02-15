@@ -4,26 +4,20 @@
 #include <vector>
 #include <ostream>
 #include <sstream>
+#include <memory>
 /*
  * Ast.hh: AST for STG
  */
 
-template <typename T>
-std::string vecToString(std::vector<T> v) {
-  std::stringstream ss;
-  ss << " ";
-  for (auto& e: v) {
-    ss << *e << " ";
-  }
-  return ss.str();
-}
 
 class AAlt;
 class PAlt;
+class Bind;
 class Atom {
 public:
   Atom(){};
   virtual std::string toString() const = 0;
+  virtual Atom* clone() const = 0;
   friend std::ostream& operator<<(std::ostream& os, const Atom &e){
     return os << e.toString();
   }
@@ -58,7 +52,18 @@ public:
     os << v.toString();
     return os;
   }
+
+  Atom* clone() const  {
+    return new Var(s);
+  }
 };
+
+std::string vecToString(const std::vector<std::unique_ptr<Expr>>& v);
+std::string vecToString(const std::vector<std::unique_ptr<Atom>>& v);
+std::string vecToString(const std::vector<Bind>& binds);
+std::string vecToString(const std::vector<Var>& vars);
+std::string vecToString(const std::vector<AAlt>& aalts);
+std::string vecToString(const std::vector<PAlt>& palts);
 
 class UpdateFlag {
 public:
@@ -76,14 +81,14 @@ public:
 
 class LambdaForm {
 public:
-  LambdaForm(std::vector<Var*>* v1, UpdateFlag* u, std::vector<Var*>* v2, Expr* e): v1(v1), u(u), v2(v2), e(e){};
-  std::vector<Var*>* v1;
-  UpdateFlag* u;
-  std::vector<Var*>* v2;
+  LambdaForm(const std::vector<Var>& v1, const UpdateFlag& u, const std::vector<Var>& v2, Expr* e): v1(v1), u(u), v2(v2), e(e){};
+  std::vector<Var> v1;
+  UpdateFlag u;
+  std::vector<Var> v2;
   Expr* e;
 
   std::string toString() const {
-    return "{" + vecToString(*v1) + "} " + u->toString() + " {" + vecToString(*v2) + "} -> " + e->toString();
+    return "{" + vecToString(v1) + "} " + u.toString() + " {" + vecToString(v2) + "} -> " + e->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const LambdaForm &l){
@@ -94,23 +99,24 @@ public:
 
 class Bind {
 public:
-  Bind(Var* v, LambdaForm* lf): v(v), lf(lf){};
-  Var* v;
-  LambdaForm* lf;
+  Bind(Var v, LambdaForm lf): v(v), lf(lf){};
+  Var v;
+  LambdaForm lf;
   std::string toString() const {
-    return v->toString() + " = " + lf->toString();
+    return v.toString() + " = " + lf.toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Bind &b){
-    os << *(b.v) << " = " << *(b.lf);
+    os << b.v << " = " << b.lf;
     return os;
   }
 };
 
+
 class Prog {
 public:
-  Prog(std::vector<Bind*>* binds): binds(binds){};
-  std::vector<Bind*>* binds;
+  Prog(const std::vector<Bind>& binds): binds(binds){};
+  std::vector<Bind> binds;
 
   Prog& operator=(const Prog& other)
   {
@@ -119,8 +125,8 @@ public:
   }
   std::string toString() const {
       std::stringstream ss;
-      for (auto& e: *binds) {
-        ss << *e << std::endl;
+      for (auto& e: binds) {
+        ss << e << std::endl;
       }
       return ss.str();
   }
@@ -203,6 +209,11 @@ public:
     os << l.toString();
     return os;
   }
+
+  Atom* clone() const {
+    return new Literal(i);
+  }
+
 };
 
 enum Prim {MUL, DIV, ADD, SUB};
@@ -239,12 +250,12 @@ public:
 
 class LocalDef: public Expr {
 public:
-  LocalDef(std::vector<Bind*>* binds, Expr* e): binds(binds), e(e){};
-  std::vector<Bind*>* binds;
+  LocalDef(const std::vector<Bind>& binds, Expr* e): binds(binds), e(e){};
+  std::vector<Bind> binds;
   Expr* e;
 
   std::string toString() const {
-    return "let " + vecToString(*binds) + "in " + e->toString();
+    return "let " + vecToString(binds) + "in " + e->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const LocalDef &e) {
@@ -254,12 +265,12 @@ public:
 
 class LocalRec: public Expr {
 public:
-  LocalRec(std::vector<Bind*>* binds, Expr* e): binds(binds), e(e){};
-  std::vector<Bind*>* binds;
+  LocalRec(const std::vector<Bind>& binds, Expr* e): binds(binds), e(e){};
+  std::vector<Bind> binds;
   Expr* e;
 
   std::string toString() const {
-    return "letrec " + vecToString(*binds) + "in " + e->toString();
+    return "letrec " + vecToString(binds) + "in " + e->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const LocalRec &l){
@@ -284,12 +295,16 @@ public:
 
 class App: public Expr {
 public:
-  App(Var* v, std::vector<Atom*>* a): function_name(v), args(a){};
+  App(Var* v, const std::vector<std::unique_ptr<Atom>>& iargs): function_name(v){
+    for (const auto& arg : iargs) {
+      args.emplace_back(std::unique_ptr<Atom>(arg->clone()));
+    }
+  };
   Var* function_name;
-  std::vector<Atom*>* args;
+  std::vector<std::unique_ptr<Atom>> args;
 
   std::string toString() const {
-    return "app " + function_name->toString() + "{" + vecToString(*args) + " }";
+    return "app " + function_name->toString() + "{" + vecToString(args) + " }";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const App &l){
@@ -300,12 +315,16 @@ public:
 
 class SatConstr: public Expr {
 public:
-  SatConstr(Constr* c, std::vector<Atom*>* a ): c(c), a(a){};
+  SatConstr(Constr* c, const std::vector<std::unique_ptr<Atom>>& iargs): c(c){
+    for (const auto& arg : iargs) {
+      args.emplace_back(std::unique_ptr<Atom>(arg->clone()));
+    }
+  };
   Constr* c;
-  std::vector<Atom*>* a;
+  std::vector<std::unique_ptr<Atom>> args;
 
   std::string toString() const {
-    return c->toString() + "{" + vecToString(*a) + "}";
+    return c->toString() + "{" + vecToString(args) + "}";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const SatConstr &l){
@@ -315,12 +334,16 @@ public:
 
 class SatOp: public Expr {
 public:
-  SatOp(Prim prim, std::vector<Atom*>* a): prim(prim), a(a){};
+  SatOp(Prim prim, const std::vector<std::unique_ptr<Atom>>& iargs): prim(prim){
+    for (const auto& arg : iargs) {
+      args.emplace_back(std::unique_ptr<Atom>(arg->clone()));
+    }
+  };
   Prim prim;
-  std::vector<Atom*>* a;
+  std::vector<std::unique_ptr<Atom>> args;
 
   std::string toString() const {
-    return primToString(prim) + " { " + vecToString(*a) + " }";
+    return primToString(prim) + " { " + vecToString(args) + " }";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const SatOp &l){
@@ -347,12 +370,12 @@ public:
 
 class AAlts: public Alt {
 public:
-  AAlts(std::vector<AAlt*>* v, Dflt* d): v(v), d(d){};
-  std::vector<AAlt*>* v;
+  AAlts(const std::vector<AAlt>& v, Dflt* d): v(v), d(d){};
+  std::vector<AAlt> v;
   Dflt* d;
 
   std::string toString() const {
-    return "AAlts: " + vecToString(*v) + d->toString();
+    return "AAlts: " + vecToString(v) + d->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const AAlts &l){
@@ -362,12 +385,12 @@ public:
 
 class PAlts: public Alt {
 public:
-  PAlts(std::vector<PAlt*>* v, Dflt* d): v(v), d(d){};
-  std::vector<PAlt*>* v;
+  PAlts(const std::vector<PAlt>& v, Dflt* d): v(v), d(d){};
+  std::vector<PAlt> v;
   Dflt* d;
 
   std::string toString() const {
-    return "PAlts: " + vecToString(*v) + d->toString();
+    return "PAlts: " + vecToString(v) + d->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const PAlts &l){
@@ -391,13 +414,13 @@ public:
 
 class AAlt {
 public:
-  AAlt(Constr* c, std::vector<Var*>* v, Expr* e): c(c), v(v), e(e){};
+  AAlt(Constr* c, const std::vector<Var>& v, Expr* e): c(c), v(v), e(e){};
   Constr* c;
-  std::vector<Var*>* v;
+  std::vector<Var> v;
   Expr* e;
 
   std::string toString() const {
-    return c->toString() + " {" + vecToString(*v) + "} -> " +  e->toString();
+    return c->toString() + " {" + vecToString(v) + "} -> " +  e->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const AAlt &l){

@@ -17,9 +17,9 @@ State::State(Prog& p){
   // First get a list of all the names
   auto binds = vector<string>();
   auto lambdas = vector<LambdaForm>();
-  for (auto& bind : *(p.binds)) {
-    binds.push_back(bind->v->s);
-    lambdas.push_back(*(bind->lf));
+  for (auto& bind : p.binds) {
+    binds.push_back(bind.v.s);
+    lambdas.push_back(bind.lf);
   }
 
   // Insert all the addresses into the map
@@ -31,8 +31,8 @@ State::State(Prog& p){
   for (auto& lambda : lambdas) {
     vector<Value> free_vars;
     // look up each free bar in the lambda
-    for (auto& var : *(lambda.v1)) {
-      Value v = genv.find(var->s)->second;
+    for (auto& var : lambda.v1) {
+      Value v = genv.find(var.s)->second;
       free_vars.push_back(v);
     }
     h.push_back(Closure(lambda, free_vars));
@@ -57,8 +57,8 @@ std::string printEnv(map<string, Value>& m) {
   return ss.str();
 }
 
-Value val(map<string, Value> local, map<string, Value> global, Atom* a) {
-  if (Var* t = dynamic_cast<Var*>(a)) {
+Value val(map<string, Value> local, map<string, Value> global, const Atom* a) {
+  if (const Var* t = dynamic_cast<const Var*>(a)) {
     auto it = local.find(t->s);
     if (it != local.end()) {
       return it->second;
@@ -71,7 +71,7 @@ Value val(map<string, Value> local, map<string, Value> global, Atom* a) {
     cout << "local: " << printEnv(local) << endl;
     cout << "global: " << printEnv(global) << endl;
     throw std::runtime_error("Could not find variable: " + t->s);
-  } else if (Literal* t = dynamic_cast<Literal*>(a)) {
+  } else if (const Literal* t = dynamic_cast<const Literal*>(a)) {
     return Value{false, t->i};
   } else {
     throw std::runtime_error("Could not cast atom");
@@ -92,8 +92,8 @@ int State::run_state(){
           enter_addr = v.i;
           // Push the arguments in backwards order so they then match
           // the function when we pop them
-          for (auto it = a->args->rbegin(); it != a->args->rend(); ++it) {
-            const Value v = val(eval_env, genv, *it);
+          for (auto it = a->args.rbegin(); it != a->args.rend(); ++it) {
+            const Value v = val(eval_env, genv, it->get());
             as.push_back(v);
           }
         } else {
@@ -107,18 +107,18 @@ int State::run_state(){
         eval_expr = l->e;
         auto pre_env = eval_env;
         // add all the binds to the scope
-        for (auto& bind: *(l->binds)) {
+        for (auto& bind: l->binds) {
           vector<Value> free_vars;
           // look up each free var in the lambda
-          for (auto& var : *(bind->lf->v1)) {
-            Value v = pre_env.find(var->s)->second;
+          for (auto& var : bind.lf.v1) {
+            Value v = pre_env.find(var.s)->second;
             free_vars.push_back(v);
           }
-          Closure c = Closure(*(bind->lf), free_vars);
+          Closure c = Closure(bind.lf, free_vars);
           int addr = h.size();
           Value v = {true, addr};
           h.push_back(c);
-          eval_env[bind->v->s] = v;
+          eval_env[bind.v.s] = v;
         }
         // Let rec binding
       } else if (LocalRec* l = dynamic_cast<LocalRec*>(eval_expr)) {
@@ -130,9 +130,9 @@ int State::run_state(){
         // First get a list of all the names
         auto vars = vector<string>();
         auto lambdas = vector<LambdaForm>();
-        for (auto& bind : *(l->binds)) {
-          vars.push_back(bind->v->s);
-          lambdas.push_back(*(bind->lf));
+        for (auto& bind : l->binds) {
+          vars.push_back(bind.v.s);
+          lambdas.push_back(bind.lf);
         }
 
         int addr = h.size();
@@ -143,14 +143,14 @@ int State::run_state(){
         }
 
         // add all the binds to the heap
-        for (auto& bind: *(l->binds)) {
+        for (auto& bind: l->binds) {
           vector<Value> free_vars;
           // look up each free var in the lambda
-          for (auto& var : *(bind->lf->v1)) {
-            Value v = eval_env.find(var->s)->second;
+          for (auto& var : bind.lf.v1) {
+            Value v = eval_env.find(var.s)->second;
             free_vars.push_back(v);
           }
-          Closure c = Closure(*(bind->lf), free_vars);
+          Closure c = Closure(bind.lf, free_vars);
           h.push_back(c);
         }
       } else if (Case* c = dynamic_cast<Case*>(eval_expr)) {
@@ -160,15 +160,15 @@ int State::run_state(){
         code = RETURNCON;
         return_constr = c->c;
         constr_values = vector<Value>();
-        for (auto& atom: *(c->a)) {
-          constr_values.push_back(val(eval_env, genv, atom));
+        for (auto& atom: c->args) {
+          constr_values.push_back(val(eval_env, genv, atom.get()));
         }
       } else if (Lit* l = dynamic_cast<Lit*>(eval_expr)) {
         code = RETURNINT;
         ret_k = l->l->i;
       } else if (SatOp* s = dynamic_cast<SatOp*>(eval_expr)) {
-        Value v1 = val(eval_env, genv, (*(s->a))[0]);
-        Value v2 = val(eval_env, genv, (*(s->a))[1]);
+        Value v1 = val(eval_env, genv, s->args[0].get());
+        Value v2 = val(eval_env, genv, s->args[1].get());
         if (v1.isAddr || v2.isAddr) {
           stringstream ss;
           ss << "Arguments to primitive operator were not ints" << endl;
@@ -209,8 +209,8 @@ int State::run_state(){
         // need to pop an update frame to fill in the rest
         unsigned as_size = as.size();
         vector<Value> old_as = as;
-        vector<Var*>* xs = lf.v2;
-        if (xs->size() > as_size) {
+        vector<Var> xs = lf.v2;
+        if (xs.size() > as_size) {
           auto tup = us.back();
           us.pop_back();
           // Append on the popped argument stack
@@ -222,12 +222,12 @@ int State::run_state(){
 
           Closure* clos_update = get<2>(tup);
           // The arguments that were defined
-          vector<Var*> xs1(xs->rend(), xs->rend()+as_size);
+          vector<Var> xs1(xs.rend(), xs.rend()+as_size);
           // The remaining arguments
-          vector<Var*>* xs2 = new vector<Var*>(xs->rend()+as_size, xs->rbegin());
-          vector<Var*>* vs = new vector<Var*>();
-          vs->insert(vs->end(), lf.v1->begin(), lf.v1->end());
-          vs->insert(vs->end(), xs1.begin(), xs1.end());
+          vector<Var> xs2 = vector<Var>(xs.rend()+as_size, xs.rbegin());
+          vector<Var> vs = vector<Var>();
+          vs.insert(vs.end(), lf.v1.begin(), lf.v1.end());
+          vs.insert(vs.end(), xs1.begin(), xs1.end());
           LambdaForm lf_updated = LambdaForm(vs, new UpdateFlag(false), xs2, lf.e);
           vector<Value> free_vars = clos.free_vars;
           free_vars.insert(free_vars.end(), old_as.begin(), old_as.end());
@@ -236,21 +236,21 @@ int State::run_state(){
           break;
         }
         // For non updatable closures
-        if (!lf.u->update) {
+        if (!lf.u.update) {
           code = EVAL;
           eval_expr = lf.e;
           // Insert each free variable into the environment
           for (unsigned i = 0; i < clos.free_vars.size(); i++) {
-            eval_env[(*(lf.v1))[i]->s] = clos.free_vars[i];
+            eval_env[lf.v1[i].s] = clos.free_vars[i];
           }
 
           // Then insert each function argument into the environment
           // Each variable in the lambda form arguments will match one
           // to one with one on the argument stack
-          for (auto& var : *(lf.v2)) {
+          for (auto& var : lf.v2) {
             Value v = as.back();
             as.pop_back();
-            eval_env[var->s] = v;
+            eval_env[var.s] = v;
           }
         } else {
           // Updatable closures
@@ -262,7 +262,7 @@ int State::run_state(){
           // An updatable closure has no arguments, so we only need to add
           // the free variables
           for (unsigned i = 0; i < clos.free_vars.size(); i++) {
-            eval_env[(*(lf.v1))[i]->s]=clos.free_vars[i];
+            eval_env[lf.v1[i].s] = clos.free_vars[i];
           }
         }
       }
@@ -284,19 +284,20 @@ int State::run_state(){
 
           // Create a list of arbitrary vars to match the addresses we have
           int num_bars = constr_values.size();
-          vector<Var*>* arb_vars = new vector<Var*>();
+          vector<Var> arb_vars = vector<Var>();
           for (int i = 0; i < num_bars; i++) {
             stringstream ss;
             ss << "$" << i;
             string s = ss.str();
-            arb_vars->push_back(new Var(s));
+            arb_vars.push_back(Var(s));
           }
-          vector<Atom*>* arb_atoms = new vector<Atom*>();
-          for (auto& var : *arb_vars) {
-            arb_atoms->push_back(var);
+          vector<unique_ptr<Atom>> arb_atoms = vector<unique_ptr<Atom>>();
+          for (auto& var : arb_vars) {
+            Atom* a = new Var(var.s);
+            arb_atoms.push_back(unique_ptr<Atom>(a));
           }
 
-          LambdaForm lf = LambdaForm(arb_vars, new UpdateFlag(false), new vector<Var*>(), new SatConstr(return_constr, arb_atoms));
+          LambdaForm lf = LambdaForm(arb_vars, new UpdateFlag(false), vector<Var>(), new SatConstr(return_constr, arb_atoms));
           // Update the closure
           *clos = Closure(lf, constr_values);
           break;
@@ -304,21 +305,21 @@ int State::run_state(){
         pair<Alt*, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
         AAlts* aalts = dynamic_cast<AAlts*>(top.first);
-        AAlt* match = NULL;
-        for (auto& aalt: *(aalts->v)) {
-          if (aalt->c->s == return_constr->s) {
-            match = aalt;
+        AAlt* match = nullptr;
+        for (auto& aalt: aalts->v) {
+          if (aalt.c->s == return_constr->s) {
+            match = &aalt;
             break;
           }
         }
         eval_env = top.second;
-        // If match is not NULL take it, else use the default
-        if (match) {
+        // If a match is found, take it, else use the default
+        if (match != nullptr) {
           code = EVAL;
           eval_expr = match->e;
           // Assign the variables to the values of the actual arguments
           for (unsigned i = 0; i < constr_values.size(); ++i) {
-            eval_env[(*(match->v))[i]->s] = constr_values[i];
+            eval_env[match->v[i].s] = constr_values[i];
           }
         } else {
           //default
@@ -333,20 +334,21 @@ int State::run_state(){
             eval_expr = u->e;
             // Create a list of arbitrary vars to match the addresses we have
             int num_bars = constr_values.size();
-            vector<Var*>* arb_vars = new vector<Var*>();
+            auto arb_vars = vector<Var>();
             vector<Value> free_vars;
             for (int i = 0; i < num_bars; i++) {
               stringstream ss;
               ss << "$" << i;
               string s = ss.str();
-              arb_vars->push_back(new Var(s));
+              arb_vars.push_back(Var(s));
             }
-            vector<Atom*>* arb_atoms = new vector<Atom*>();
-            for (auto& var : *arb_vars) {
-              arb_atoms->push_back(var);
+            auto arb_atoms = vector<unique_ptr<Atom>>();
+            for (auto& var : arb_vars) {
+              Var* v = new Var(var.s);
+              arb_atoms.push_back(unique_ptr<Var>(v));
             }
 
-            LambdaForm lf = LambdaForm(arb_vars, new UpdateFlag(false), new vector<Var*>(), new SatConstr(return_constr, arb_atoms));
+            LambdaForm lf = LambdaForm(arb_vars, UpdateFlag(false), vector<Var>(), new SatConstr(return_constr, arb_atoms));
             Closure constr = Closure(lf, constr_values);
             int addr = h.size();
             Value v = {true, addr};
@@ -370,10 +372,10 @@ int State::run_state(){
         pair<Alt*, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
         PAlts* palts = dynamic_cast<PAlts*>(top.first);
-        if (palts == NULL){
+        if (palts == nullptr){
           // Try default
           Default* def = dynamic_cast<Default*>(top.first);
-          if (def != NULL) {
+          if (def != nullptr) {
             Dflt* dflt = def->d;
             // if there is not variable bound, just set the expression
             // If there is, we need to allocate a constructor closure to bind to it
@@ -393,15 +395,15 @@ int State::run_state(){
           ss << "Tried to match a value " << ret_k << " against a AAlts " << *aalts;
           throw std::runtime_error(ss.str());
         }
-        PAlt* match = NULL;
-        for (auto& palt: *(palts->v)) {
-          if (palt->l->i == ret_k) {
-            match = palt;
+        PAlt* match = nullptr;
+        for (auto& palt: palts->v) {
+          if (palt.l->i == ret_k) {
+            match = &palt;
             break;
           }
         }
-        // If match is not NULL take it, else use the default
-        if (match) {
+        // If match is not nullptr take it, else use the default
+        if (match != nullptr) {
           code = EVAL;
           eval_expr = match->e;
         } else {

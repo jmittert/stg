@@ -36,19 +36,19 @@ using namespace std;
   Prog* p;
   Bind* b;
   LambdaForm* lf;
-  std::vector<Bind*>* bs;
+  std::vector<Bind>* bs;
   Expr* e;
   AAlt* aa;
   PAlt* pa;
-  std::vector<AAlt*>* aas;
-  std::vector<PAlt*>* pas;
+  std::vector<AAlt>* aas;
+  std::vector<PAlt>* pas;
   Dflt* d;
   Literal* l;
   Prim pr;
   Atom* at;
-  std::vector<Atom*>* ats;
+  std::vector<std::unique_ptr<Atom>>* ats;
   Var* v;
-  std::vector<Var*>* vs;
+  std::vector<Var>* vs;
   Constr* c;
   UpdateFlag* u;
 }
@@ -83,47 +83,47 @@ using namespace std;
 %%
 
 program
-: binds bind {{$1->push_back($2); $$ = new Prog($1); driver.p = $$;}}
+: binds bind {{$1->push_back(*$2); delete $2; $$ = new Prog(*$1); delete $1; driver.p = $$;}}
 ;
 
 bind
-: var ASSIGN lambdaform {{$$=new Bind($1, $3);}}
+: var ASSIGN lambdaform {{$$=new Bind(*$1, *$3); delete $1; delete $3;}}
 ;
 
 binds
-:          {{$$ = new std::vector<Bind*>();}}
-| binds bind{{$1->push_back($2); $$ = $1;}}
+:          {{$$ = new std::vector<Bind>();}}
+| binds bind{{$1->push_back(*$2); delete $2; $$ = $1;}}
 ;
 
 lambdaform
-: LBRACE vars RBRACE update_flag LBRACE vars RBRACE ARROW expr {{$$ = new LambdaForm($2, $4, $6,$9);}}
+: LBRACE vars RBRACE update_flag LBRACE vars RBRACE ARROW expr {{$$ = new LambdaForm(*$2, *$4, *$6, $9); delete $2; delete $4; delete $6;}}
 ;
 
 expr
-: LET binds bind IN expr     {{$2->push_back($3); $$ = new LocalDef($2, $5);}}
-| LETREC binds bind IN expr  {{$2->push_back($3); $$ = new LocalRec($2, $5);}}
-| CASE expr OF LBRACE aalts dflt RBRACE    {{$$ = new Case($2, new AAlts($5, $6));}}
-| CASEP expr OF LBRACE palts dflt RBRACE    {{$$ = new Case($2, new PAlts($5, $6));}}
-| var LBRACE atoms RBRACE    {{$$ = new App($1, $3);}}
-| constr LBRACE atoms RBRACE {{$$ = new SatConstr($1, $3);}}
-| prim LBRACE atoms RBRACE   {{$$ = new SatOp($1, $3);}}
+: LET binds bind IN expr     {{$2->push_back(*$3); $$ = new LocalDef(*$2, $5); delete $2; delete $3;}}
+| LETREC binds bind IN expr  {{$2->push_back(*$3); $$ = new LocalRec(*$2, $5); delete $2; delete $3;}}
+| CASE expr OF LBRACE aalts dflt RBRACE    {{$$ = new Case($2, new AAlts(*$5, $6)); delete $5;}}
+| CASEP expr OF LBRACE palts dflt RBRACE    {{$$ = new Case($2, new PAlts(*$5, $6)); delete $5;}}
+| var LBRACE atoms RBRACE    {{$$ = new App($1, *$3); delete $3;}}
+| constr LBRACE atoms RBRACE {{$$ = new SatConstr($1, *$3); delete $3;}}
+| prim LBRACE atoms RBRACE   {{$$ = new SatOp($1, *$3); delete $3;}}
 | lit                        {{$$ = new Lit($1);}}
 ;
 
 aalt
-: constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, $3, $6);}}
+: constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, *$3, $6); delete $3;}}
 ;
 palt
 : lit ARROW expr {{ $$ = new PAlt($1, $3);}}
 ;
 
 aalts
-:            {{$$ = new std::vector<AAlt*>();}}
-| aalts aalt {{$1->push_back($2); $$ = $1;}}
+:            {{$$ = new std::vector<AAlt>();}}
+| aalts aalt {{$1->push_back(*$2); delete $2; $$ = $1;}}
 
 palts
-:            {{$$ = new std::vector<PAlt*>();}}
-| palts palt {{$1->push_back($2); $$ = $1;}}
+:            {{$$ = new std::vector<PAlt>();}}
+| palts palt {{$1->push_back(*$2); delete $2; $$ = $1;}}
 ;
 
 dflt
@@ -154,8 +154,8 @@ atom
 ;
 
 atoms
-:            {{$$ = new std::vector<Atom*>();}}
-| atoms atom {{$1->push_back($2); $$ = $1;}}
+:            {{$$ = new std::vector<unique_ptr<Atom>>();}}
+| atoms atom {{$1->emplace_back(unique_ptr<Atom>($2)); $$ = $1;}}
 ;
 
 var
@@ -163,8 +163,8 @@ var
 ;
 
 vars
-:          {{$$ = new std::vector<Var*>();}}
-| vars var {{$1->push_back($2); $$ = $1;}}
+:          {{$$ = new std::vector<Var>();}}
+| vars var {{$1->push_back(*$2); delete $2; $$ = $1;}}
 ;
 
 constr
