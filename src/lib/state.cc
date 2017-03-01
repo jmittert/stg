@@ -9,8 +9,8 @@ State::State(Prog& p){
   // and we should add all the definitions to globals and the corresponding
   // closures to the heap
   as = vector<Value>();
-  rs = vector<pair<Alt*, map<string, Value>>>();
-  us = vector<tuple<vector<Value>, vector<pair<Alt*, map<string, Value>>>, Closure* >>();
+  rs = vector<pair<shared_ptr<const Alt>, map<string, Value>>>();
+  us = vector<tuple<vector<Value>, vector<pair<shared_ptr<const Alt>, map<string, Value>>>, shared_ptr<Closure> >>();
   h = vector<Closure>();
   genv  = map<string, Value>();
 
@@ -58,7 +58,7 @@ std::string printEnv(map<string, Value>& m) {
 }
 
 Value val(map<string, Value> local, map<string, Value> global, const Atom* a) {
-  if (const Var* t = dynamic_cast<const Var*>(a)) {
+  if (auto t = dynamic_cast<const Var*>(a)) {
     auto it = local.find(t->s);
     if (it != local.end()) {
       return it->second;
@@ -71,7 +71,7 @@ Value val(map<string, Value> local, map<string, Value> global, const Atom* a) {
     cout << "local: " << printEnv(local) << endl;
     cout << "global: " << printEnv(global) << endl;
     throw std::runtime_error("Could not find variable: " + t->s);
-  } else if (const Literal* t = dynamic_cast<const Literal*>(a)) {
+  } else if (auto t = dynamic_cast<const Literal*>(a)) {
     return Value{false, t->i};
   } else {
     throw std::runtime_error("Could not cast atom");
@@ -82,9 +82,9 @@ int State::run_state(){
   while (1){
     switch (code) {
     case EVAL:
-      if (App* a = dynamic_cast<App*>(eval_expr)) {
+      if (auto a = dynamic_pointer_cast<const App>(eval_expr)) {
         // Function application
-        Value v = val(eval_env, genv, a->function_name);
+        Value v = val(eval_env, genv, &(a->function_name));
         if (v.isAddr) {
           // If the name resolves to a pointer, then we have a function
           // Push the appropriate arguments onto the stack then eval it
@@ -102,7 +102,7 @@ int State::run_state(){
           code = RETURNINT;
           ret_k = v.i;
         }
-      } else if (LocalDef* l = dynamic_cast<LocalDef*>(eval_expr)) {
+      } else if (auto l = dynamic_pointer_cast<const LocalDef>(eval_expr)) {
         code = EVAL;
         eval_expr = l->e;
         auto pre_env = eval_env;
@@ -121,7 +121,7 @@ int State::run_state(){
           eval_env[bind.v.s] = v;
         }
         // Let rec binding
-      } else if (LocalRec* l = dynamic_cast<LocalRec*>(eval_expr)) {
+      } else if (auto l = dynamic_pointer_cast<const LocalRec>(eval_expr)) {
         // Similar to the let binding, but each closure get also can refer to
         // the other bindings as well
         code = EVAL;
@@ -153,20 +153,20 @@ int State::run_state(){
           Closure c = Closure(bind.lf, free_vars);
           h.push_back(c);
         }
-      } else if (Case* c = dynamic_cast<Case*>(eval_expr)) {
-        eval_expr = c->e;
-        rs.push_back(make_pair(c->a, eval_env));
-      } else if (SatConstr* c = dynamic_cast<SatConstr*>(eval_expr)) {
+      } else if (auto c = dynamic_pointer_cast<const Case>(eval_expr)) {
+        eval_expr = c->expr;
+        rs.push_back(make_pair(c->alt, eval_env));
+      } else if (auto c = dynamic_pointer_cast<const SatConstr>(eval_expr)) {
         code = RETURNCON;
         return_constr = c->c;
         constr_values = vector<Value>();
         for (auto& atom: c->args) {
           constr_values.push_back(val(eval_env, genv, atom.get()));
         }
-      } else if (Lit* l = dynamic_cast<Lit*>(eval_expr)) {
+      } else if (auto l = dynamic_pointer_cast<const Lit>(eval_expr)) {
         code = RETURNINT;
-        ret_k = l->l->i;
-      } else if (SatOp* s = dynamic_cast<SatOp*>(eval_expr)) {
+        ret_k = l->l.i;
+      } else if (auto s = dynamic_pointer_cast<const SatOp>(eval_expr)) {
         Value v1 = val(eval_env, genv, s->args[0].get());
         Value v2 = val(eval_env, genv, s->args[1].get());
         if (v1.isAddr || v2.isAddr) {
@@ -220,7 +220,7 @@ int State::run_state(){
           // The return stack must be empty, use the popped one
           rs = get<1>(tup);
 
-          Closure* clos_update = get<2>(tup);
+          shared_ptr<Closure> clos_update = get<2>(tup);
           // The arguments that were defined
           vector<Var> xs1(xs.rend(), xs.rend()+as_size);
           // The remaining arguments
@@ -228,7 +228,7 @@ int State::run_state(){
           vector<Var> vs = vector<Var>();
           vs.insert(vs.end(), lf.v1.begin(), lf.v1.end());
           vs.insert(vs.end(), xs1.begin(), xs1.end());
-          LambdaForm lf_updated = LambdaForm(vs, new UpdateFlag(false), xs2, lf.e);
+          LambdaForm lf_updated = LambdaForm(vs, UpdateFlag(false), xs2, lf.e);
           vector<Value> free_vars = clos.free_vars;
           free_vars.insert(free_vars.end(), old_as.begin(), old_as.end());
           // Update the closure
@@ -254,7 +254,7 @@ int State::run_state(){
           }
         } else {
           // Updatable closures
-          us.push_back(make_tuple(as,rs, &clos));
+          us.push_back(make_tuple(as,rs, shared_ptr<Closure>(new Closure(clos))));
           as.clear();
           rs.clear();
           code = EVAL;
@@ -280,7 +280,7 @@ int State::run_state(){
           as = get<0>(tup);
           rs = get<1>(tup);
 
-          Closure *clos = get<2>(tup);
+          shared_ptr<Closure> clos = get<2>(tup);
 
           // Create a list of arbitrary vars to match the addresses we have
           int num_bars = constr_values.size();
@@ -293,21 +293,20 @@ int State::run_state(){
           }
           vector<unique_ptr<Atom>> arb_atoms = vector<unique_ptr<Atom>>();
           for (auto& var : arb_vars) {
-            Atom* a = new Var(var.s);
-            arb_atoms.push_back(unique_ptr<Atom>(a));
+            arb_atoms.push_back(unique_ptr<Atom>(new Var(var.s)));
           }
 
-          LambdaForm lf = LambdaForm(arb_vars, new UpdateFlag(false), vector<Var>(), new SatConstr(return_constr, arb_atoms));
+          LambdaForm lf = LambdaForm(arb_vars, UpdateFlag(false), vector<Var>(), shared_ptr<Expr>(new SatConstr(return_constr, arb_atoms)));
           // Update the closure
           *clos = Closure(lf, constr_values);
           break;
         }
-        pair<Alt*, std::map<std::string, Value>> top = rs.back();
+        pair<shared_ptr<const Alt>, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
-        AAlts* aalts = dynamic_cast<AAlts*>(top.first);
-        AAlt* match = nullptr;
+        auto aalts = dynamic_pointer_cast<const AAlts>(top.first);
+        const AAlt* match = nullptr;
         for (auto& aalt: aalts->v) {
-          if (aalt.c->s == return_constr->s) {
+          if (aalt.c.s == return_constr.s) {
             match = &aalt;
             break;
           }
@@ -323,13 +322,13 @@ int State::run_state(){
           }
         } else {
           //default
-          Dflt* dflt = aalts->d;
+          shared_ptr<const Dflt> dflt = aalts->d;
           // if there is not variable bound, just set the expression
           // If there is, we need to allocate a constructor closure to bind to it
-          if (Unnamed* u = dynamic_cast<Unnamed*>(dflt)) {
+          if (auto u = dynamic_pointer_cast<const Unnamed>(dflt)) {
             code = EVAL;
             eval_expr = u->e;
-          } else if (Named* n = dynamic_cast<Named*>(dflt)) {
+          } else if (auto n = dynamic_pointer_cast<const Named>(dflt)) {
             code = EVAL;
             eval_expr = u->e;
             // Create a list of arbitrary vars to match the addresses we have
@@ -344,19 +343,18 @@ int State::run_state(){
             }
             auto arb_atoms = vector<unique_ptr<Atom>>();
             for (auto& var : arb_vars) {
-              Var* v = new Var(var.s);
-              arb_atoms.push_back(unique_ptr<Var>(v));
+              arb_atoms.push_back(unique_ptr<Var>(new Var(var.s)));
             }
 
-            LambdaForm lf = LambdaForm(arb_vars, UpdateFlag(false), vector<Var>(), new SatConstr(return_constr, arb_atoms));
+            LambdaForm lf = LambdaForm(arb_vars, UpdateFlag(false), vector<Var>(), shared_ptr<Expr>(new SatConstr(return_constr, arb_atoms)));
             Closure constr = Closure(lf, constr_values);
             int addr = h.size();
             Value v = {true, addr};
             h.push_back(constr);
-            eval_env[n->v->s] = v;
-          } else if (NoDflt* n = dynamic_cast<NoDflt*>(dflt)) {
+            eval_env[n->v.s] = v;
+          } else if (auto n = dynamic_pointer_cast<const NoDflt>(dflt)) {
             stringstream ss;
-            ss << "No default matched in " << *aalts << " for " << return_constr->s << endl;
+            ss << "No default matched in " << *aalts << " for " << return_constr.s << endl;
             throw std::runtime_error(ss.str());
           }
         }
@@ -369,35 +367,35 @@ int State::run_state(){
         if (rs.empty()) {
           return ret_k;
         }
-        pair<Alt*, std::map<std::string, Value>> top = rs.back();
+        pair<shared_ptr<const Alt>, std::map<std::string, Value>> top = rs.back();
         rs.pop_back();
-        PAlts* palts = dynamic_cast<PAlts*>(top.first);
+        auto palts = dynamic_pointer_cast<const PAlts>(top.first);
         if (palts == nullptr){
           // Try default
-          Default* def = dynamic_cast<Default*>(top.first);
+          auto def = dynamic_pointer_cast<const Default>(top.first);
           if (def != nullptr) {
-            Dflt* dflt = def->d;
+            shared_ptr<const Dflt> dflt = def->d;
             // if there is not variable bound, just set the expression
             // If there is, we need to allocate a constructor closure to bind to it
-            if (Unnamed* u = dynamic_cast<Unnamed*>(dflt)) {
+            if (auto u = dynamic_pointer_cast<const Unnamed>(dflt)) {
               code = EVAL;
               eval_expr = u->e;
-            } else if (Named* n = dynamic_cast<Named*>(dflt)) {
+            } else if (auto n = dynamic_pointer_cast<const Named>(dflt)) {
               code = EVAL;
               eval_expr = u->e;
               Value v = {false, ret_k};
-              eval_env[n->v->s] = v;
+              eval_env[n->v.s] = v;
             }
             break;
           }
-          AAlts* aalts = dynamic_cast<AAlts*>(top.first);
+          auto aalts = dynamic_pointer_cast<const AAlts>(top.first);
           stringstream ss;
           ss << "Tried to match a value " << ret_k << " against a AAlts " << *aalts;
           throw std::runtime_error(ss.str());
         }
-        PAlt* match = nullptr;
+        const PAlt* match = nullptr;
         for (auto& palt: palts->v) {
-          if (palt.l->i == ret_k) {
+          if (palt.l.i == ret_k) {
             match = &palt;
             break;
           }
@@ -408,18 +406,18 @@ int State::run_state(){
           eval_expr = match->e;
         } else {
           // default
-          Dflt* dflt = palts->d;
+          shared_ptr<const Dflt> dflt = palts->d;
           // if there is not variable bound, just set the expression
           // If there is, we need to allocate a constructor closure to bind to it
-          if (Unnamed* u = dynamic_cast<Unnamed*>(dflt)) {
+          if (auto u = dynamic_pointer_cast<const Unnamed>(dflt)) {
             code = EVAL;
             eval_expr = u->e;
-          } else if (Named* n = dynamic_cast<Named*>(dflt)) {
+          } else if (auto n = dynamic_pointer_cast<const Named>(dflt)) {
             code = EVAL;
             eval_expr = n->e;
             Value v = {false, ret_k};
-            eval_env[n->v->s] = v;
-          } else if (NoDflt* n = dynamic_cast<NoDflt*>(dflt)) {
+            eval_env[n->v.s] = v;
+          } else if (auto n = dynamic_pointer_cast<const NoDflt>(dflt)) {
             stringstream ss;
             ss << "No default matched in " << *palts << " for " << ret_k << endl;
             throw std::runtime_error(ss.str());

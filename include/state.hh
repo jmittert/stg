@@ -34,7 +34,7 @@ public:
   // Evaluate the expression e in environment p
   // and apply its value to the arguments on the
   // argument stack
-  Expr* eval_expr;
+  std::shared_ptr<const Expr> eval_expr;
   std::map<std::string, Value> eval_env;
 
   // Enter Arg
@@ -45,7 +45,7 @@ public:
   // ReturnCons c ws
   // Return the constructor c applied to values ws to the continuations
   // on the return stack
-  Constr* return_constr;
+  Constr return_constr = Constr("");
   std::vector<Value> constr_values;
 
   // ReturnInt k
@@ -57,12 +57,12 @@ public:
   std::vector<Value> as;
 
   // The return stack which contains continuations
-  std::vector<std::pair<Alt*, std::map<std::string, Value>>> rs;
+  std::vector<std::pair<std::shared_ptr<const Alt>, std::map<std::string, Value>>> rs;
 
   // The update stack which contains update frames
   // A frame is a triple of the arugment stack, the return stack and the
   // closure being entered
-  std::vector<std::tuple<std::vector<Value>, std::vector<std::pair<Alt*, std::map<std::string, Value>>>, Closure*>> us;
+  std::vector<std::tuple<std::vector<Value>, std::vector<std::pair<std::shared_ptr<const Alt>, std::map<std::string, Value>>>, std::shared_ptr<Closure>>> us;
 
   // The heap, h which contains closures
   std::vector<Closure> h;

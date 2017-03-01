@@ -83,7 +83,7 @@ using namespace std;
 %%
 
 program
-: binds bind {{$1->push_back(*$2); delete $2; $$ = new Prog(*$1); delete $1; driver.p = $$;}}
+: binds bind {{$1->push_back(*$2); driver.p = Prog(*$1); delete $1; delete $2;}}
 ;
 
 bind
@@ -91,30 +91,30 @@ bind
 ;
 
 binds
-:          {{$$ = new std::vector<Bind>();}}
-| binds bind{{$1->push_back(*$2); delete $2; $$ = $1;}}
+:            {{$$ = new std::vector<Bind>();}}
+| binds bind {{$1->push_back(*$2); delete $2; $$ = $1;}}
 ;
 
 lambdaform
-: LBRACE vars RBRACE update_flag LBRACE vars RBRACE ARROW expr {{$$ = new LambdaForm(*$2, *$4, *$6, $9); delete $2; delete $4; delete $6;}}
+: LBRACE vars RBRACE update_flag LBRACE vars RBRACE ARROW expr {{$$ = new LambdaForm(*$2, *$4, *$6, shared_ptr<const Expr>($9)); delete $2; delete $4; delete $6;}}
 ;
 
 expr
-: LET binds bind IN expr     {{$2->push_back(*$3); $$ = new LocalDef(*$2, $5); delete $2; delete $3;}}
-| LETREC binds bind IN expr  {{$2->push_back(*$3); $$ = new LocalRec(*$2, $5); delete $2; delete $3;}}
-| CASE expr OF LBRACE aalts dflt RBRACE    {{$$ = new Case($2, new AAlts(*$5, $6)); delete $5;}}
-| CASEP expr OF LBRACE palts dflt RBRACE    {{$$ = new Case($2, new PAlts(*$5, $6)); delete $5;}}
-| var LBRACE atoms RBRACE    {{$$ = new App($1, *$3); delete $3;}}
-| constr LBRACE atoms RBRACE {{$$ = new SatConstr($1, *$3); delete $3;}}
+: LET    binds bind IN expr  {{$2->push_back(*$3); $$ = new LocalDef(*$2, shared_ptr<const Expr>($5)); delete $2; delete $3;}}
+| LETREC binds bind IN expr  {{$2->push_back(*$3); $$ = new LocalRec(*$2, shared_ptr<const Expr>($5)); delete $2; delete $3;}}
+| CASE expr OF LBRACE aalts dflt RBRACE    {{$$ = new Case(shared_ptr<const Expr>($2), std::shared_ptr<const Alt>(new AAlts(*$5, std::shared_ptr<const Dflt>($6)))); delete $5;}}
+| CASEP expr OF LBRACE palts dflt RBRACE    {{$$ = new Case(shared_ptr<const Expr>($2), std::shared_ptr<const Alt>(new PAlts(*$5, std::shared_ptr<const Dflt>($6)))); delete $5;}}
+| var LBRACE atoms RBRACE    {{$$ = new App(*$1, *$3); delete $1; delete $3;}}
+| constr LBRACE atoms RBRACE {{$$ = new SatConstr(*$1, *$3); delete $1; delete $3;}}
 | prim LBRACE atoms RBRACE   {{$$ = new SatOp($1, *$3); delete $3;}}
-| lit                        {{$$ = new Lit($1);}}
+| lit                        {{$$ = new Lit(*$1); delete $1;}}
 ;
 
 aalt
-: constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt($1, *$3, $6); delete $3;}}
+: constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt(*$1, *$3, shared_ptr<const Expr>($6)); delete $1; delete $3;}}
 ;
 palt
-: lit ARROW expr {{ $$ = new PAlt($1, $3);}}
+: lit ARROW expr {{ $$ = new PAlt(*$1, shared_ptr<const Expr>($3)); delete $1;}}
 ;
 
 aalts
@@ -128,8 +128,8 @@ palts
 
 dflt
 :                {{$$ = new NoDflt(); }}
-| var ARROW expr {{$$ = new Named($1, $3);}}
-| DEFAULT ARROW expr {{$$ = new Unnamed($3);}}
+| var ARROW expr {{$$ = new Named(*$1, std::shared_ptr<Expr>($3)); delete $1;}}
+| DEFAULT ARROW expr {{$$ = new Unnamed(std::shared_ptr<Expr>($3));}}
 ;
 
 lit

@@ -17,7 +17,7 @@ public:
   virtual ~parser_driver();
   int result;
 
-  Prog* p;
+  Prog p = Prog(std::vector<Bind>());
 
   void scan_begin();
   void scan_end();

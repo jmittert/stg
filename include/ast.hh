@@ -27,8 +27,8 @@ class Expr {
 public:
   Expr(){};
   virtual std::string toString() const = 0;
-  friend std::ostream& operator<<(std::ostream& os, const Expr &l){
-    return os << l.toString();
+  friend std::ostream& operator<<(std::ostream& os, const Expr &e){
+    return os << e.toString();
   }
 };
 
@@ -41,7 +41,7 @@ public:
     return os;
   }
 };
-class Var: public Atom{
+class Var: public Atom {
 public:
   Var(std::string s): s(s){};
   std::string s;
@@ -81,11 +81,12 @@ public:
 
 class LambdaForm {
 public:
-  LambdaForm(const std::vector<Var>& v1, const UpdateFlag& u, const std::vector<Var>& v2, Expr* e): v1(v1), u(u), v2(v2), e(e){};
   std::vector<Var> v1;
   UpdateFlag u;
   std::vector<Var> v2;
-  Expr* e;
+  std::shared_ptr<const Expr> e;
+
+  LambdaForm(const std::vector<Var>& v1, const UpdateFlag& u, const std::vector<Var>& v2, std::shared_ptr<const Expr> e): v1(v1), u(u), v2(v2), e(e){};
 
   std::string toString() const {
     return "{" + vecToString(v1) + "} " + u.toString() + " {" + vecToString(v2) + "} -> " + e->toString();
@@ -151,24 +152,24 @@ public:
 
 class Named: public Dflt {
 public:
-  Named(Var* v, Expr* e): v(v), e(e){};
-  Var*v;
-  Expr* e;
+  Named(const Var& v, std::shared_ptr<const Expr> e): v(v), e(e){};
+  const Var v;
+  std::shared_ptr<const Expr> e;
 
   std::string toString() const {
-    return v->toString() + " -> " + e->toString();
+    return v.toString() + " -> " + e->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Named &n){
-    os << *(n.v) << " -> " << *(n.e);
+    os << n.v << " -> " << *(n.e);
     return os;
   }
 };
 
 class Unnamed: public Dflt {
 public:
-  Unnamed(Expr* e): e(e){};
-  Expr* e;
+  Unnamed(std::shared_ptr<const Expr> e): e(e){};
+  std::shared_ptr<const Expr> e;
 
   std::string toString() const {
     return "default -> " + e->toString();
@@ -250,9 +251,9 @@ public:
 
 class LocalDef: public Expr {
 public:
-  LocalDef(const std::vector<Bind>& binds, Expr* e): binds(binds), e(e){};
+  LocalDef(const std::vector<Bind>& binds, std::shared_ptr<const Expr> e): binds(binds), e(e){};
   std::vector<Bind> binds;
-  Expr* e;
+  std::shared_ptr<const Expr> e;
 
   std::string toString() const {
     return "let " + vecToString(binds) + "in " + e->toString();
@@ -265,9 +266,9 @@ public:
 
 class LocalRec: public Expr {
 public:
-  LocalRec(const std::vector<Bind>& binds, Expr* e): binds(binds), e(e){};
+  LocalRec(const std::vector<Bind>& binds, std::shared_ptr<const Expr> e): binds(binds), e(e){};
   std::vector<Bind> binds;
-  Expr* e;
+  std::shared_ptr<const Expr> e;
 
   std::string toString() const {
     return "letrec " + vecToString(binds) + "in " + e->toString();
@@ -280,12 +281,12 @@ public:
 
 class Case: public Expr {
 public:
-  Case(Expr* e, Alt* a): e(e), a(a){};
-  Expr* e;
-  Alt* a;
+  Case(std::shared_ptr<const Expr> e, std::shared_ptr<const Alt> a): expr(e), alt(a){};
+  std::shared_ptr<const Expr> expr;
+  std::shared_ptr<const Alt> alt;
 
   std::string toString() const {
-    return  "case " + e->toString() + " of " + a->toString();
+    return  "case " + expr->toString() + " of " + alt->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Case &l) {
@@ -295,16 +296,16 @@ public:
 
 class App: public Expr {
 public:
-  App(Var* v, const std::vector<std::unique_ptr<Atom>>& iargs): function_name(v){
+  App(const Var& v, const std::vector<std::unique_ptr<Atom>>& iargs): function_name(v){
     for (const auto& arg : iargs) {
       args.emplace_back(std::unique_ptr<Atom>(arg->clone()));
     }
   };
-  Var* function_name;
+  const Var function_name;
   std::vector<std::unique_ptr<Atom>> args;
 
   std::string toString() const {
-    return "app " + function_name->toString() + "{" + vecToString(args) + " }";
+    return "app " + function_name.toString() + "{" + vecToString(args) + " }";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const App &l){
@@ -315,16 +316,16 @@ public:
 
 class SatConstr: public Expr {
 public:
-  SatConstr(Constr* c, const std::vector<std::unique_ptr<Atom>>& iargs): c(c){
+  SatConstr(const Constr c, const std::vector<std::unique_ptr<Atom>>& iargs): c(c){
     for (const auto& arg : iargs) {
       args.emplace_back(std::unique_ptr<Atom>(arg->clone()));
     }
   };
-  Constr* c;
+  const Constr c;
   std::vector<std::unique_ptr<Atom>> args;
 
   std::string toString() const {
-    return c->toString() + "{" + vecToString(args) + "}";
+    return c.toString() + "{" + vecToString(args) + "}";
   }
 
   friend std::ostream& operator<<(std::ostream& os, const SatConstr &l){
@@ -334,12 +335,12 @@ public:
 
 class SatOp: public Expr {
 public:
-  SatOp(Prim prim, const std::vector<std::unique_ptr<Atom>>& iargs): prim(prim){
+  SatOp(const Prim prim, const std::vector<std::unique_ptr<Atom>>& iargs): prim(prim){
     for (const auto& arg : iargs) {
       args.emplace_back(std::unique_ptr<Atom>(arg->clone()));
     }
   };
-  Prim prim;
+  const Prim prim;
   std::vector<std::unique_ptr<Atom>> args;
 
   std::string toString() const {
@@ -354,11 +355,11 @@ public:
 
 class Lit: public Expr {
 public:
-  Lit(Literal* l): l(l){};
-  Literal* l;
+  Lit(const Literal& l): l(l){};
+  Literal l;
 
   std::string toString() const {
-    return l->toString();
+    return l.toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Lit &l){
@@ -370,9 +371,9 @@ public:
 
 class AAlts: public Alt {
 public:
-  AAlts(const std::vector<AAlt>& v, Dflt* d): v(v), d(d){};
+  AAlts(const std::vector<AAlt>& v, std::shared_ptr<const Dflt> d): v(v), d(d){};
   std::vector<AAlt> v;
-  Dflt* d;
+  std::shared_ptr<const Dflt> d;
 
   std::string toString() const {
     return "AAlts: " + vecToString(v) + d->toString();
@@ -385,9 +386,9 @@ public:
 
 class PAlts: public Alt {
 public:
-  PAlts(const std::vector<PAlt>& v, Dflt* d): v(v), d(d){};
+  PAlts(const std::vector<PAlt>& v, std::shared_ptr<const Dflt> d): v(v), d(d){};
   std::vector<PAlt> v;
-  Dflt* d;
+  std::shared_ptr<const Dflt> d;
 
   std::string toString() const {
     return "PAlts: " + vecToString(v) + d->toString();
@@ -400,8 +401,8 @@ public:
 
 class Default: public Alt {
 public:
-  Default(Dflt* d): d(d){};
-  Dflt* d;
+  Default(std::shared_ptr<const Dflt> d): d(d){};
+  std::shared_ptr<const Dflt> d;
 
   std::string toString() const {
     return d->toString();
@@ -414,13 +415,14 @@ public:
 
 class AAlt {
 public:
-  AAlt(Constr* c, const std::vector<Var>& v, Expr* e): c(c), v(v), e(e){};
-  Constr* c;
+  Constr c;
   std::vector<Var> v;
-  Expr* e;
+  std::shared_ptr<const Expr> e;
+
+  AAlt(const Constr& c, const std::vector<Var>& v, std::shared_ptr<const Expr> e): c(c), v(v), e(e) {};
 
   std::string toString() const {
-    return c->toString() + " {" + vecToString(v) + "} -> " +  e->toString();
+    return c.toString() + " {" + vecToString(v) + "} -> " +  e->toString();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const AAlt &l){
@@ -430,12 +432,13 @@ public:
 
 class PAlt {
 public:
-  PAlt(Literal* l, Expr* e): l(l), e(e){};
-  Literal* l;
-  Expr* e;
+  const Literal l;
+  std::shared_ptr<const Expr> e;
+
+  PAlt(const Literal l, std::shared_ptr<const Expr> e): l(l), e(e){};
 
   std::string toString() const {
-    return l->toString() + " {" + e->toString() + "}";
+    return l.toString() + " {" + e->toString() + "}";
   }
   friend std::ostream& operator<<(std::ostream& os, const PAlt &l){
     return os << l.toString();

@@ -1,0 +1,24 @@
+fib = {} @n {a b n} -> case n{} of {
+    Int {n} -> case' n{} of {
+        0 -> a{}
+        default -> case' - {n 1} of {
+            t -> case a{} of {
+                Int {m} -> case b{} of {
+                    Int {o} -> case' + {m o} of {
+                        u ->
+                        let bn = {} @n {} -> Int {o}
+                            un = {} @n {} -> Int {u}
+                            nn = {} @n {} -> Int {t}
+                        in fib {bn un nn}
+                    }
+                }
+            }
+        }
+    }
+}
+
+main = {} @n {} ->
+    let base1 = {} @n {} -> Int {0}
+        base2 = {} @n {} -> Int {1}
+        count = {} @n {} -> Int {200000}
+           in fib { base1 base2 count}
