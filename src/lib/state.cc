@@ -167,37 +167,73 @@ int State::run_state(){
         code = RETURNINT;
         ret_k = l->l.i;
       } else if (auto s = dynamic_pointer_cast<const SatOp>(eval_expr)) {
-        Value v1 = val(eval_env, genv, s->args[0].get());
-        Value v2 = val(eval_env, genv, s->args[1].get());
-        if (v1.isAddr || v2.isAddr) {
-          stringstream ss;
-          ss << "Arguments to primitive operator were not ints" << endl;
-          ss << "Prim: " << primToString(s->prim) << endl;;
-          ss << "Arg1: " << v1 << endl;
-          ss << "Arg2: " << v2 << endl;
-          ss << "Local: " << printEnv(eval_env) << endl;
-          ss << "Global: " << printEnv(genv) << endl;
-          throw std::runtime_error(ss.str());
-        }
-        int x1 = v1.i;
-        int x2 = v2.i;
-        code = RETURNINT;
-        switch(s->prim) {
-        case ADD:
-          ret_k = x1+x2;
-          break;
-        case SUB:
-          ret_k = x1-x2;
-          break;
-        case MUL:
-          ret_k = x1*x2;
-          break;
-        case DIV:
-          if (x2 == 0) {
-            throw std::runtime_error("Divide by 0 error");
+        if (s->args.size() == 1) {
+          // This must be the print operator
+          Value v1 = val(eval_env, genv, s->args[0].get());
+          int x1 = v1.i;
+          code = RETURNINT;
+          ret_k = x1;
+          cout << x1 << endl;
+        } else {
+          Value v1 = val(eval_env, genv, s->args[0].get());
+          Value v2 = val(eval_env, genv, s->args[1].get());
+          if (v1.isAddr || v2.isAddr) {
+            stringstream ss;
+            ss << "Arguments to primitive operator were not ints" << endl;
+            ss << "Prim: " << primToString(s->prim) << endl;;
+            ss << "Arg1: " << v1 << endl;
+            ss << "Arg2: " << v2 << endl;
+            ss << "Local: " << printEnv(eval_env) << endl;
+            ss << "Global: " << printEnv(genv) << endl;
+            throw std::runtime_error(ss.str());
           }
-          ret_k = x1 / x2;
-          break;
+          int x1 = v1.i;
+          int x2 = v2.i;
+          code = RETURNINT;
+          switch(s->prim) {
+          case ADD:
+            ret_k = x1+x2;
+            break;
+          case SUB:
+            ret_k = x1-x2;
+            break;
+          case MUL:
+            ret_k = x1*x2;
+            break;
+          case DIV:
+            if (x2 == 0) {
+              throw std::runtime_error("Divide by 0 error");
+            }
+            ret_k = x1 / x2;
+            break;
+          case GT:
+            code = RETURNCON;
+            return_constr = Constr(x1>x2 ? "True" : "False");
+            constr_values.clear();
+            break;
+          case LT:
+            code = RETURNCON;
+            return_constr = Constr(x1<x2 ? "True" : "False");
+            constr_values.clear();
+            break;
+          case EQ:
+            code = RETURNCON;
+            return_constr = Constr(x1==x2 ? "True" : "False");
+            constr_values.clear();
+            break;
+          case LTE:
+            code = RETURNCON;
+            return_constr = Constr(x1<=x2 ? "True" : "False");
+            constr_values.clear();
+            break;
+          case GTE:
+            code = RETURNCON;
+            return_constr = Constr(x1>=x2 ? "True" : "False");
+            constr_values.clear();
+            break;
+          case PRINT:
+            throw std::runtime_error("Passed print wrong # of args");
+          }
         }
       }
       break;
@@ -205,12 +241,18 @@ int State::run_state(){
       {
         Closure clos = h[enter_addr];
         LambdaForm lf = clos.lf;
-        // If there are no enough arguments on the stack for the closure, we
+        // If there are not enough arguments on the stack for the closure, we
         // need to pop an update frame to fill in the rest
         unsigned as_size = as.size();
         vector<Value> old_as = as;
         vector<Var> xs = lf.v2;
         if (xs.size() > as_size) {
+          if (us.empty()) {
+            stringstream ss;
+            ss << "Update stack is empty. Entering: "
+               << lf << "with " << old_as[0] << endl;
+            throw std::runtime_error(ss.str());
+          }
           auto tup = us.back();
           us.pop_back();
           // Append on the popped argument stack
@@ -222,9 +264,9 @@ int State::run_state(){
 
           shared_ptr<Closure> clos_update = get<2>(tup);
           // The arguments that were defined
-          vector<Var> xs1(xs.rend(), xs.rend()+as_size);
+          vector<Var> xs1(xs.rbegin(), xs.rbegin()+as_size);
           // The remaining arguments
-          vector<Var> xs2 = vector<Var>(xs.rend()+as_size, xs.rbegin());
+          vector<Var> xs2 = vector<Var>(xs.rbegin()+as_size, xs.rend());
           vector<Var> vs = vector<Var>();
           vs.insert(vs.end(), lf.v1.begin(), lf.v1.end());
           vs.insert(vs.end(), xs1.begin(), xs1.end());
@@ -330,7 +372,7 @@ int State::run_state(){
             eval_expr = u->e;
           } else if (auto n = dynamic_pointer_cast<const Named>(dflt)) {
             code = EVAL;
-            eval_expr = u->e;
+            eval_expr = n->e;
             // Create a list of arbitrary vars to match the addresses we have
             int num_bars = constr_values.size();
             auto arb_vars = vector<Var>();

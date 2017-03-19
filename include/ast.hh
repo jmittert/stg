@@ -217,7 +217,7 @@ public:
 
 };
 
-enum Prim {MUL, DIV, ADD, SUB};
+enum Prim {MUL, DIV, ADD, SUB, LT, LTE, GT, GTE, EQ, PRINT};
 inline std::string primToString(Prim p) {
   switch (p) {
   case MUL:
@@ -228,6 +228,18 @@ inline std::string primToString(Prim p) {
     return "+";
   case SUB:
     return "-";
+  case GT:
+    return ">";
+  case LT:
+    return "<";
+  case GTE:
+    return ">=";
+  case LTE:
+    return "<=";
+  case EQ:
+    return "==";
+  case PRINT:
+    return "!!";
   }
 }
 

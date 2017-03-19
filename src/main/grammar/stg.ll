@@ -26,11 +26,17 @@ yylloc->step();
 
 [ \t]+             yylloc->step() ;
 [\n]+              { yylloc->lines(yyleng); yylloc->step(); }
-"default"          { return token::DEFAULT; }
+"_"                { return token::DEFAULT; }
 "+"                { return token::ADD; }
 "-"                { return token::SUB; }
 "*"                { return token::MUL; }
 "/"                { return token::DIV; }
+">="               { return token::GTE; }
+"<="               { return token::LTE; }
+"=="               { return token::EQ; }
+">"                { return token::GT; }
+"<"                { return token::LT; }
+"!!"                { return token::PRINT; }
 "@u"               { return token::UPDATE; }
 "@n"               { return token::NOUPDATE; }
 "->"               { return token::ARROW; }

@@ -1,0 +1,90 @@
+append = {} @n {xs ys} ->
+ case xs{} of {
+    Nil {} -> ys{}
+    Cons {z zs} -> let rest = {zs ys} @u {} -> append {zs ys} in Cons {z rest}
+ }
+
+map = {} @n {f xs} ->
+  case xs{} of {
+    Nil {} -> Nil {}
+    Cons {y ys} -> let fy = {f y} @u {} -> f {y}
+                       mfy = {f ys} @u {} -> map {f ys}
+                   in Cons {fy mfy}
+  }
+
+lt = {} @n {x y} ->
+ case x{} of {
+     Int {x} -> case y {} of {
+         Int {y} -> case <{x y} of {
+            True{} -> True{}
+            False{} -> False{}
+         }
+     }
+  }
+
+gt = {} @n {x y} ->
+ case x{} of {
+     Int {x} -> case y {} of {
+         Int {y} -> case >{x y} of {
+            True{} -> True{}
+            False{} -> False{}
+         }
+     }
+  }
+
+filter = {} @n {f xs} ->
+  case xs{} of {
+    Nil {} -> Nil {}
+    Cons {y ys} -> let fy = {f y} @u {} -> f {y}
+                       fys = {f ys} @u {} -> filter {f ys}
+                   in case fy{} of {
+                       True {} -> Cons {y fys}
+                       False {} -> fys{}
+                   }
+  }
+
+qsort = {} @n {xs} -> case xs{} of {
+    Nil {} -> Nil {}
+    Cons {y ys} -> letrec gtPivot = {y} @u {} -> gt {y}
+                          ltPivot = {y} @u {} -> lt {y}
+                          back = {xs gtPivot} @u {} -> filter {gtPivot xs}
+                          front = {xs ltPivot} @u {} -> filter {ltPivot xs}
+                          backS = {back} @u {} -> qsort {back}
+                          frontS = {front} @u {} -> qsort {front}
+                          mid = {y backS} @u {} -> Cons {y backS}
+                          result = {frontS mid} @u {} -> append {frontS mid}
+                          in result{}
+}
+
+printInt = {} @n {x} -> case x{} of {
+    Int {x1} -> case' !!{x1} of {a -> Int {a}}
+}
+
+force = {} @n {xs} ->
+  case xs{} of {
+    Nil {} -> Int {0}
+    Cons {y ys} -> let sys = {ys} @u {} -> force {ys}
+                   in case y{} of {
+                       _ -> case sys {} of {
+                           x -> x{}
+                       }
+                   }
+  }
+
+main = {} @n {} ->
+    letrec empty = {} @u {} -> Nil {}
+           three = {} @u {} -> Int {3}
+           four = {} @u {} -> Int {4}
+           six = {} @u {} -> Int {6}
+           zero = {} @u {} -> Int {0}
+           seven = {} @u {} -> Int {7}
+           one = {} @u {} -> Int {1}
+           lst0 = {three empty} @u {} -> Cons {three empty}
+           lst1 = {four lst0} @u {} -> Cons {four lst0}
+           lst2 = {six lst1} @u {} -> Cons {six lst1}
+           lst3 = {zero lst2} @u {} -> Cons {zero lst2}
+           lst4 = {zero lst3} @u {} -> Cons {seven lst3}
+           lst5 = {zero lst4} @u {} -> Cons {one lst4}
+           sorted = {lst5} @u {} -> qsort {lst5}
+           print = {sorted} @u {} -> map {printInt sorted}
+           in force {print}

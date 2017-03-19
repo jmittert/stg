@@ -56,7 +56,8 @@ using namespace std;
 
 /* Tokens */
 %token  <ival>          NUM
-%token                  ADD SUB MUL DIV
+%token                  ADD SUB MUL DIV PRINT
+%token                  GT LT GTE LTE EQ
 %token                  LET LETREC CASE CASEP IN ASSIGN DEFAULT OF
 %token                  LBRACE RBRACE ARROW
 %token                  UPDATE NOUPDATE
@@ -110,6 +111,9 @@ expr
 | lit                        {{$$ = new Lit(*$1); delete $1;}}
 ;
 
+
+
+
 aalt
 : constr LBRACE vars RBRACE ARROW expr {{ $$ = new AAlt(*$1, *$3, shared_ptr<const Expr>($6)); delete $1; delete $3;}}
 ;
@@ -143,9 +147,15 @@ update_flag
 
 prim
 : ADD {{$$ = ADD;}}
+| LT  {{$$ = LT;}}
+| GT  {{$$ = GT;}}
+| LTE {{$$ = LTE;}}
+| GTE {{$$ = GTE;}}
+| EQ  {{$$ = EQ;}}
 | SUB {{$$ = SUB;}}
 | MUL {{$$ = MUL;}}
 | DIV {{$$ = DIV;}}
+| PRINT {{$$ = PRINT;}}
 ;
 
 atom
