@@ -52,8 +52,7 @@ qsort = {} @n {xs} -> case xs{} of {
                           backS = {back} @u {} -> qsort {back}
                           frontS = {front} @u {} -> qsort {front}
                           mid = {y backS} @u {} -> Cons {y backS}
-                          result = {frontS mid} @u {} -> append {frontS mid}
-                          in result{}
+                          in append {frontS mid}
 }
 
 printInt = {} @n {x} -> case x{} of {

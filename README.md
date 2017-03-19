@@ -56,6 +56,23 @@ bindings, letrec bindings and higher order functions
 Running adds 3 to each element in [3] and sums the result, giving 6. This is
 appropriately equivalent to the Haskell code `sum $ map (+3) [3]`.
 
+Of course, while we're at it, we have to demonstrate the obligatory (not
+actually quicksort because technically it's not in place) quicksort
+```
+qsort = {} @n {xs} -> case xs{} of {
+    Nil {} -> Nil {}
+    Cons {y ys} -> letrec gtPivot = {y} @u {} -> gt {y}
+                          ltPivot = {y} @u {} -> lt {y}
+                          back = {xs gtPivot} @u {} -> filter {gtPivot xs}
+                          front = {xs ltPivot} @u {} -> filter {ltPivot xs}
+                          backSorted = {back} @u {} -> qsort {back}
+                          frontSorted = {front} @u {} -> qsort {front}
+                          mid = {y backSorted} @u {} -> Cons {y backSorted}
+                          in append {frontSorted mid}
+}
+```
+
+See the full implementation [here](test/sort.stg)
 
 ## Build
 Standard cmake
